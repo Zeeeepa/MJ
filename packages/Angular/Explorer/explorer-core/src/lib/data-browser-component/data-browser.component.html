@@ -11,7 +11,10 @@
       </div>
       <div class="config-button">
         <button kendoButton (click)="ShowAppSelectionDialog()"><span class="fa-solid fa-gear"></span></button>
-        <mj-record-selector-dialog [AvailableRecords]="AllApplications" 
+      </div>
+      
+  </div>
+  <mj-record-selector-dialog [AvailableRecords]="AllApplications" 
                                    [SelectedRecords]="SelectedApplications" 
                                    [UnselectedRecords]="UnselectedApplications"
                                    [DialogVisible]="AppSelectionDialogVisible"
@@ -19,8 +22,6 @@
                                    DisplayIconField="Icon"
                                    (DialogClosed)="OnAppSelectionDialogClosed($event)">
         </mj-record-selector-dialog>
-      </div>
-  </div>
   <div class="main-area"> 
       <kendo-loader *ngIf="showLoader" type="converging-spinner" ></kendo-loader>
       <div class="card-list k-d-flex k-flex-row k-h-full k-flex-wrap" *ngIf="!showLoader">
