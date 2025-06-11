@@ -16,7 +16,6 @@
   display: flex;
   background-color: lightgray;
   padding: 12px;
-  height: 24px;
 }
 
 .header button { /*buttons within the header*/
