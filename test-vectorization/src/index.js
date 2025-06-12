@@ -55,7 +55,8 @@ if (!entityDocument) {
 const request = {
   entityID: entityDocument.EntityID,
   entityDocumentID: entityDocument.ID,
-  batchCount: 20,
+  batchCount: 10,
+  ListID: 'list id here',
   options: {},
 };
 
