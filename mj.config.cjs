@@ -383,6 +383,90 @@ const config = {
 
   // Used only for MJCLI
   migrationsLocation: process.env.MIGRATIONS_LOCATION ?? 'filesystem:./migrations',
+
+  // MCP Server Configuration
+  mcpServerSettings: {
+    port: 3100,
+    enableMCPServer: true,
+    
+    entityTools: [
+      // // Expose all entities with all operations
+      // {
+      //   entityName: '*',
+      //   schemaName: '*',
+      //   get: true,
+      //   create: true,
+      //   update: true,
+      //   delete: true,
+      //   runView: true
+      // },
+      
+      // Override: Users entity with limited operations
+      {
+        entityName: 'Users',
+        schemaName: '__mj',
+        get: true,
+        runView: true,
+        create: false,
+        update: false,
+        delete: false
+      },
+      {
+        entityName: 'Conversations',
+        schemaName: '__mj',
+        get: true,
+        runView: true,
+        create: false,
+        update: false,
+        delete: false
+      },
+      {
+        entityName: 'Conversation Details',
+        schemaName: '__mj',
+        get: true,
+        runView: true,
+        create: false,
+        update: false,
+        delete: false
+      },
+      {
+        entityName: 'Content Items',
+        schemaName: '__mj',
+        get: true,
+        runView: true,
+        create: false,
+        update: false,
+        delete: false
+      },
+      {
+        entityName: 'Content Item Tags',
+        schemaName: '__mj',
+        get: true,
+        runView: true,
+        create: false,
+        update: false,
+        delete: false
+      },
+      {
+        entityName: 'Content Item Attributes',
+        schemaName: '__mj',
+        get: true,
+        runView: true,
+        create: false,
+        update: false,
+        delete: false
+      },
+      {
+        entityName: 'Content Type Attributes',
+        schemaName: '__mj',
+        get: true,
+        runView: true,
+        create: false,
+        update: false,
+        delete: false
+      }
+    ]
+  }
 };
 
 module.exports = config;
