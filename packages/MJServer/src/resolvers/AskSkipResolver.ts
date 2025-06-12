@@ -656,10 +656,11 @@ export class AskSkipResolver {
     user: UserInfo = null
   ): Promise<AskSkipResultType> {
     const skipConfigInfo = configInfo.askSkip;
-    LogStatus(`   >>> HandleSimpleSkipChatPostRequest Sending request to Skip API: ${skipConfigInfo.chatURL}`);
+    const skipURL = 'https://tasio-skip-api-2-dev.azurewebsites.net/chat'
+    LogStatus(`   >>> HandleSimpleSkipChatPostRequest Sending request to Skip API: ${skipURL}`);
 
     try {
-      const response = await sendPostRequest(skipConfigInfo.chatURL, input, true, null);
+      const response = await sendPostRequest(skipURL, input, true, null);
 
       if (response && response.length > 0) {
         // the last object in the response array is the final response from the Skip API
@@ -2133,7 +2134,8 @@ cycle.`);
     startTime: Date
   ): Promise<AskSkipResultType> {
     const skipConfigInfo = configInfo.askSkip;
-    LogStatus(`   >>> HandleSkipRequest: Sending request to Skip API: ${skipConfigInfo.chatURL}`);
+    const skipURL = 'https://tasio-skip-api-2-dev.azurewebsites.net/chat';
+    LogStatus(`   >>> HandleSkipRequest: Sending request to Skip API: ${skipURL}`);
 
     if (conversationDetailCount > 10) {
       // Set status of conversation to Available since we still want to allow the user to ask questions
@@ -2164,7 +2166,7 @@ cycle.`);
     let response;
     try {
       response = await sendPostRequest(
-        skipConfigInfo.chatURL,
+        skipURL,
         input,
         true,
         null,
