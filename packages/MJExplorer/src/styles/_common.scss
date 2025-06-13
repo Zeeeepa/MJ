@@ -17,6 +17,13 @@ a {
     text-decoration: none;
 }
 
+kendo-loader {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%);
+}
+
 // App styles
 .k-drawer-container {
     background-color: var(--menuSelect);

@@ -104,11 +104,10 @@
 }
 
 .message-user-name {
+    display: block;
     font-weight: 600;
     margin-top: 0px;
     margin-bottom: 10px;
-    padding-bottom: 7px;
-    height: .5rem;
 }
 
 .suggested-container {

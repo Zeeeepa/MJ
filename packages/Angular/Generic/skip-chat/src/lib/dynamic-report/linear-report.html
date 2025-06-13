@@ -1,5 +1,6 @@
 @if(SkipData) {
     <div style="display: flex; flex-direction: column; height: 100%;">
+        
         <!-- Report Controls -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <div style="display: flex; align-items: center;">
@@ -17,7 +18,12 @@
                 </button>
             }
         </div>
-
+        @if (SkipData.userExplanation) {
+            <div style="margin-bottom: 1.5rem;">
+                <strong style="color: #666;">Explanation:</strong>
+                <span style="margin-left: 5px;">{{SkipData.userExplanation}}</span>
+            </div>
+        }
         <!-- Main Report Content -->
         <div style="flex: 1; min-height: 0; overflow: hidden;">
             @if(IsChart) {
@@ -48,13 +54,7 @@
 
         <!-- Bottom Bar with Explanation -->
         @if (SkipData.userExplanation || SkipData.analysis) {
-            <div style="border-top: 1px solid #e0e0e0; padding: 10px; background-color: #f8f9fa; display: flex; gap: 20px; align-items: flex-start;">
-                @if (SkipData.userExplanation) {
-                    <div style="flex: 1;">
-                        <strong style="color: #666;">Explanation:</strong>
-                        <span style="margin-left: 5px;">{{SkipData.userExplanation}}</span>
-                    </div>
-                }
+            <div>
                 @if (SkipData.analysis) {
                     <div style="flex: 1;">
                         <strong style="color: #666;">Analysis:</strong>

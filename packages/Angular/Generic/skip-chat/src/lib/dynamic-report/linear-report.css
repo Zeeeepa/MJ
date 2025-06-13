@@ -27,3 +27,7 @@
     display: block;
     padding: 5px;
 }
+
+skip-dynamic-grid, skip-dynamic-chart {
+    margin-bottom: 1.5rem;
+}
