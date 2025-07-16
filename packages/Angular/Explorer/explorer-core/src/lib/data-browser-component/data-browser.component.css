@@ -56,6 +56,14 @@
     justify-content: center;
 }
 
+/* Image icon styling */
+.mj-card-icon-image {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    margin: 0 auto 1rem;
+}
+
 /* Responsive adjustments for card height */
 @media (max-width: 1024px) {
     .mj-kendo-icon-card .k-card-body {

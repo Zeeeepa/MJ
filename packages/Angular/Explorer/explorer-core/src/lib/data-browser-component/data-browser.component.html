@@ -47,13 +47,20 @@
             [attr.role]="'button'"
             [attr.aria-label]="'Open ' + app.Name + ' application'">
             <kendo-card-body>
-                <i *ngIf="app.Icon && app.Icon.length > 0" 
-                   [ngClass]="app.Icon" 
-                   class="mj-card-icon-large"
-                   [attr.aria-hidden]="true"></i>
-                <i *ngIf="!app.Icon || app.Icon.length === 0" 
-                   class="fas fa-cube mj-card-icon-large"
-                   [attr.aria-hidden]="true"></i>
+                @if (app.Icon && app.Icon.length > 0) {
+                    @if (app.Icon.startsWith('data:image')) {
+                        <img [src]="app.Icon" 
+                             [alt]="app.Name + ' icon'"
+                             class="mj-card-icon-large mj-card-icon-image">
+                    } @else {
+                        <i [ngClass]="app.Icon" 
+                           class="mj-card-icon-large"
+                           [attr.aria-hidden]="true"></i>
+                    }
+                } @else {
+                    <i class="fas fa-cube mj-card-icon-large"
+                       [attr.aria-hidden]="true"></i>
+                }
                 <h3>{{ app.Name }}</h3>
                 <p *ngIf="app.Description">{{ app.Description }}</p>
                 <p *ngIf="!app.Description" class="text-muted">No description available</p>
