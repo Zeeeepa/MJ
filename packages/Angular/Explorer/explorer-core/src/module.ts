@@ -6,6 +6,7 @@ import { RouterModule, RouteReuseStrategy } from '@angular/router';
 // Services
 import { SystemValidationService } from './lib/services/system-validation.service';
 import { StartupValidationService } from './lib/services/startup-validation.service';
+import { GoldenLayoutService } from './lib/services/golden-layout.service';
 
 // Kendo UI Angular imports
 import { ButtonsModule } from '@progress/kendo-angular-buttons'; 
@@ -58,6 +59,8 @@ import { FilesComponent } from './lib/files/files.component';
 import { GenericBrowseListComponent } from './lib/generic-browse-list/generic-browse-list.component';
 import { FormToolbarComponent } from './lib/generic/form-toolbar';
 import { ResourceContainerComponent } from './lib/generic/resource-container-component';
+import { GoldenLayoutContainerComponent } from './lib/golden-layout-container/golden-layout-container.component';
+import { PanelWrapperComponent } from './lib/panel-wrapper/panel-wrapper.component';
 import { HeaderComponent } from './lib/header/header.component';
 import { GenericBrowserListComponent } from './lib/generic-browser-list/generic-browser-list.component';
 import { HomeComponent } from './lib/home-component/home.component';
@@ -101,6 +104,8 @@ import { StyleGuideTestComponent } from './lib/style-guide-test/style-guide-test
   declarations: [
     FormToolbarComponent,
     ResourceContainerComponent,
+    GoldenLayoutContainerComponent,
+    PanelWrapperComponent,
     AuthButtonComponent,
     DashboardBrowserComponent,
     DataBrowserComponent,
@@ -201,6 +206,8 @@ import { StyleGuideTestComponent } from './lib/style-guide-test/style-guide-test
   exports: [
     FormToolbarComponent,
     ResourceContainerComponent,
+    GoldenLayoutContainerComponent,
+    PanelWrapperComponent,
     AuthButtonComponent,
     DashboardBrowserComponent,
     DataBrowserComponent,
@@ -241,7 +248,8 @@ import { StyleGuideTestComponent } from './lib/style-guide-test/style-guide-test
   providers: [
     { provide: RouteReuseStrategy, useClass: CustomReuseStrategy },
     SystemValidationService,
-    StartupValidationService
+    StartupValidationService,
+    GoldenLayoutService
   ],
 })
 export class ExplorerCoreModule {}

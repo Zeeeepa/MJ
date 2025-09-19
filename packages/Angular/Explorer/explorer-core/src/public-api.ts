@@ -4,6 +4,9 @@
 
 export * from './lib/generic/form-toolbar';
 export * from './lib/generic/resource-container-component';
+export * from './lib/services/golden-layout.service';
+export * from './lib/golden-layout-container/golden-layout-container.component';
+export * from './lib/panel-wrapper/panel-wrapper.component';
 
 export * from './lib/auth-button/auth-button.component'
 export * from './lib/dashboard-browser-component/dashboard-browser.component'

@@ -48,9 +48,12 @@
     "mj_generatedentities": "1.0.0",
     "rxjs": "^7.8.1",
     "tslib": "^2.3.0",
-    "zone.js": "^0.14.0"
+    "zone.js": "^0.14.0",
+    "golden-layout": "^2.6.0",
+    "jquery": "^3.7.1"
   },
   "devDependencies": {
+    "@types/jquery": "^3.5.30",
     "@angular-devkit/build-angular": "18.0.3",
     "@angular/cli": "18.0.3",
     "@angular/compiler-cli": "18.0.2",

@@ -2,6 +2,10 @@
 @import './variables';
 @import './typography';
 
+// Import Golden Layout styles
+@import '../../../../node_modules/golden-layout/dist/css/goldenlayout-base.css';
+@import '../../../../node_modules/golden-layout/dist/css/themes/goldenlayout-light-theme.css';
+
 // Import Kendo theme BEFORE our overrides
 // Using package resolution - works regardless of repository structure
 @import '@progress/kendo-theme-default/scss/all';

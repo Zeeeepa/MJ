@@ -17,6 +17,12 @@ import { TemplateEngineBase } from '@memberjunction/templates-base-types';
 import { CommunicationEngineBase } from '@memberjunction/communication-types';
 import { EntityCommunicationsEngineClient } from '@memberjunction/entity-communications-client';
 import { MJNotificationService } from '@memberjunction/ng-notifications';
+import { GoldenLayoutContainerComponent } from '../golden-layout-container/golden-layout-container.component';
+import { GoldenLayoutService, PanelComponent, PanelComponentState } from '../services/golden-layout.service';
+import { PanelWrapperComponent } from '../panel-wrapper/panel-wrapper.component';
+import { ResourceContainerComponent } from '../generic/resource-container-component';
+import { ResolvedLayoutConfig } from 'golden-layout';
+import { PanelClosedEvent, PanelSelectedEvent } from '../golden-layout-container/golden-layout-container.component';
 
 export interface Tab {
   id?: string;
@@ -66,8 +72,12 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild(DrawerComponent, { static: false }) drawer!: DrawerComponent;
   @ViewChild('mjTabstrip', { static: false }) mjTabStrip!: MJTabStripComponent;
+  @ViewChild('goldenLayoutContainer', { static: false }) goldenLayoutContainer!: GoldenLayoutContainerComponent;
   @ViewChild('drawerWrapper', { static: false }) drawerWrapper!: ElementRef;
   @ViewChild('container', { static: true, read: ElementRef }) container !: ElementRef;
+
+  // Feature flag to enable Golden Layout
+  public useGoldenLayout: boolean = true; // Set to true to enable Golden Layout
 
   @HostListener('window:resize')
   onWindowResize(): void {
@@ -94,7 +104,8 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
     private location: Location,
     private renderer: Renderer2,
     private titleService: Title,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private goldenLayoutService: GoldenLayoutService
   ) {
     this.tabs = [];
   }
@@ -184,10 +195,27 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
       });
 
     this.route.queryParams.subscribe(params => {
-      // what we want to do here is CACHE the params for the CURRENT tab so we have them 
+      // what we want to do here is CACHE the params for the CURRENT tab so we have them
       // to throw back in the URL whenever the tab gets clicked on again in the future
       this.tabQueryParams['tab_' + this.activeTabIndex] = params;
     });
+
+    // If using Golden Layout, initialize it after view is ready
+    if (this.useGoldenLayout) {
+      setTimeout(() => {
+        console.log('NavigationComponent: Setting up Golden Layout');
+        // Wait for Golden Layout container to be initialized
+        if (this.goldenLayoutService.layoutInitialized.value) {
+          this.initializeGoldenLayout();
+        } else {
+          this.goldenLayoutService.layoutInitialized.subscribe((initialized) => {
+            if (initialized) {
+              this.initializeGoldenLayout();
+            }
+          });
+        }
+      }, 500); // Increase delay to ensure container is ready
+    }
   }
 
   private _loggedIn: boolean = false;
@@ -238,7 +266,12 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
                 this.AddOrSelectTab(<ResourceData>event.args);
                 break;
               case EventCodes.CloseCurrentTab:
-                if(this.mjTabStrip && this.activeTabIndex > 0) {
+                if (this.useGoldenLayout) {
+                  // In Golden Layout mode, close the active panel
+                  // TODO: Implement panel close logic for Golden Layout
+                  LogStatus("Close panel not yet implemented for Golden Layout");
+                }
+                else if(this.mjTabStrip && this.activeTabIndex > 0) {
                   this.mjTabStrip.CloseTab(this.activeTabIndex);
                 }
                 else{
@@ -264,7 +297,11 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
         const trigger = (<any>args).navigationTrigger;
         switch (trigger) {
           case 'imperative':
-            // this is a programmatic navigation, so we don't want to do anything here
+            // For Golden Layout, we need to handle imperative navigation too
+            // (e.g., when clicking on cards in the Home panel)
+            if (this.useGoldenLayout) {
+              this.NavigateFromUrl();
+            }
             break;
           case 'popstate':
             // this is a browser back/forward navigation, so we want to do something here
@@ -292,7 +329,8 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
   private _mostRecentURL: string = '';
   private _mostRecentHomeURL: string = ''; // used only when we're on the home tab so we can remember the full URL for the HOME tab when we come back to it from another tab
   protected async NavigateFromUrl() {
-    let url = this.router.url.trim().toLowerCase();
+    const originalUrl = this.router.url.trim();
+    let url = originalUrl.toLowerCase();
     if (url === '/') {
       this._mostRecentURL = '/home';
       this.router.navigate(['/home']); // redirect to /home
@@ -301,12 +339,20 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
     else {
       this._mostRecentURL = this.router.url;
 
-      // see if this matches a drawer item or not
-      const item = this.drawerItems.find(i => url.toLowerCase().trim().startsWith((<any>i).path?.toLowerCase().trim()));
-
-      if (item) {
-        this.selectDrawerItem(this.drawerItems.indexOf(item));
+      // Check if this is an application/entity route
+      if (url.startsWith('/app/') && this.useGoldenLayout) {
+        // Use original URL to preserve case for app/entity names
+        await this.handleApplicationRoute(originalUrl);
         this.gotFirstNav = true;
+      }
+      else {
+        // see if this matches a drawer item or not
+        const item = this.drawerItems.find(i => url.toLowerCase().trim().startsWith((<any>i).path?.toLowerCase().trim()));
+
+        if (item) {
+          this.selectDrawerItem(this.drawerItems.indexOf(item));
+          this.gotFirstNav = true;
+        }
       }
     }
 
@@ -340,16 +386,16 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
 
-  selectDrawerItem(index: number) {
+  async selectDrawerItem(index: number) {
     this.selectedDrawerItem = this.drawerItems[index];
     this.showExpansionPanel = index === 2;
     // Get the <ul> element that contains the <li> elements
     const ulElement = this.drawerWrapper.nativeElement.querySelector('ul');
-    
+
     if (ulElement) {
       // Get the <li> element at the specified index
       const liElement = ulElement.children[index];
-    
+
       // add the k-selected class to the <li> element
       this.renderer.addClass(liElement, 'k-selected');
 
@@ -360,8 +406,36 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     }
 
-    // make sure that the first tab is selected since this is showing stuff in the Home/Nav tab
-    this.setActiveTabToHome();
+    // In Golden Layout mode, create a panel for the selected drawer item
+    if (this.useGoldenLayout && this.goldenLayoutContainer && this.selectedDrawerItem) {
+      const drawerItem = this.selectedDrawerItem;
+      const drawerTypeMap: Record<string, string> = {
+        'Home': 'Home',
+        'Settings': 'Settings',
+        'Ask Skip': 'AskSkip',
+        'Files': 'Files',
+        'Lists': 'Lists',
+        'Data': 'Data'
+      };
+      const drawerItemType = drawerTypeMap[drawerItem.text || ''] || drawerItem.text || '';
+
+      const resourceData = new ResourceData({
+        ID: this.generatePanelId(),
+        Name: drawerItem.text,
+        ResourceTypeID: 'drawer-item',
+        ResourceRecordID: '',
+        Configuration: {
+          path: (<any>drawerItem).path,
+          drawerItemType: drawerItemType,
+          isDrawerItem: true
+        }
+      });
+
+      await this.AddOrSelectPanel(resourceData);
+    } else {
+      // Original tab-based behavior
+      this.setActiveTabToHome();
+    }
   }
 
   protected setActiveTabToHome() {
@@ -463,12 +537,68 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /**
-   * This method will load all the workspace items that are part of the workspace currently set in the workSpace member variable 
+   * This method will load all the workspace items that are part of the workspace currently set in the workSpace member variable
    */
   protected async LoadWorkspaceItems(): Promise<void> {
     const md = new Metadata();
     this.tabs = []; // first clear out the tabs - this is often already the state but in case this is a full refresh, make sure we do this.
+
+    // If using Golden Layout, wait for it to be initialized
+    if (this.useGoldenLayout) {
+      // Register components first
+      this.goldenLayoutService.registerComponent('panel-wrapper', PanelWrapperComponent);
+
+      // Check if workspace has a saved Golden Layout configuration
+      const layoutConfigItem = this.workSpaceItems.find(item =>
+        item.Name === '___GOLDEN_LAYOUT_CONFIG___'
+      );
+
+      if (layoutConfigItem?.Configuration) {
+        try {
+          const config = JSON.parse(layoutConfigItem.Configuration);
+          if (config.goldenLayout && this.goldenLayoutContainer) {
+            // Load the saved layout configuration
+            setTimeout(() => {
+              console.log('Restoring saved Golden Layout configuration');
+              this.goldenLayoutContainer.loadLayout(config.goldenLayout);
+            }, 200);
+
+            // Still need to populate tabs array for tracking (excluding the layout config item)
+            for (let item of this.workSpaceItems) {
+              if (item.Name === '___GOLDEN_LAYOUT_CONFIG___') continue; // Skip the layout config item
+
+              const itemData = item.Configuration ? JSON.parse(item.Configuration) : {};
+              const resourceData: ResourceData = new ResourceData({
+                ID: item.ID,
+                Name: item.Name,
+                ResourceTypeID: item.ResourceTypeID,
+                ResourceRecordID: item.ResourceRecordID,
+                Configuration: itemData,
+              });
+              const newTab: Tab = {
+                id: item.ID,
+                labelLoading: false,
+                contentLoading: false,
+                data: resourceData,
+                workspaceItem: item,
+                icon: resourceData.ResourceIcon,
+                label: item.Name
+              };
+              await this.internalAddTab(newTab);
+            }
+            return; // Exit early since we loaded the saved layout
+          }
+        } catch (error) {
+          console.error('Error parsing workspace configuration, falling back to default:', error);
+        }
+      }
+    }
+
+    // Default loading behavior (no saved layout or not using Golden Layout)
     for (let item of this.workSpaceItems) {
+      // Skip the layout configuration item
+      if (item.Name === '___GOLDEN_LAYOUT_CONFIG___') continue;
+
       const itemData = item.Configuration ? JSON.parse(item.Configuration) : {};
       const resourceData: ResourceData = new ResourceData({
         ID: item.ID,
@@ -485,7 +615,27 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
         workspaceItem: item, // provide the entity object here so we can modify it later if needed
         icon: resourceData.ResourceIcon
       }
-      // now add to data structure
+
+      if (this.useGoldenLayout && this.goldenLayoutContainer) {
+        // Add as panels to Golden Layout
+        const panelState: PanelComponentState = {
+          resourceData: resourceData,
+          componentType: 'panel-wrapper',
+          label: item.Name,
+          icon: resourceData.ResourceIcon,
+          id: item.ID,
+          workspaceItemId: item.ID
+        };
+
+        // Add panel after a small delay to ensure GL is ready
+        setTimeout(() => {
+          if (this.goldenLayoutContainer) {
+            this.goldenLayoutContainer.addPanel(panelState);
+          }
+        }, 100);
+      }
+
+      // Always add to tabs array for tracking
       await this.internalAddTab(newTab);
 
       setTimeout(async () => {
@@ -499,7 +649,82 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
           this.setAppTitle(newTab.label)
       },10)
     }
-    this.mjTabStrip.SelectedTabIndex = 0; 
+    if (!this.useGoldenLayout && this.mjTabStrip) {
+      this.mjTabStrip.SelectedTabIndex = 0;
+    }
+
+    // If using Golden Layout and no workspace items were loaded, add Home panel as default
+    if (this.useGoldenLayout && this.workSpaceItems.length === 0 && this.goldenLayoutContainer) {
+      console.log('No workspace items found, adding Home panel as default');
+      await this.addDefaultHomePanel();
+    }
+  }
+
+  private async handleApplicationRoute(url: string): Promise<void> {
+    // Parse the URL to extract app name and entity name
+    const urlParts = url.split('/').filter(p => p);
+    const appName = urlParts[1]; // After 'app'
+    const entityName = urlParts[2]; // Optional entity name
+
+    // Create resource data for the application/entity view
+    const resourceData = new ResourceData({
+      ID: this.generatePanelId(),
+      Name: entityName ? `${appName} - ${entityName}` : appName,
+      ResourceTypeID: 'application-view', // Special type for application views
+      ResourceRecordID: '',
+      Configuration: {
+        appName: appName,
+        entityName: entityName,
+        isApplicationView: true
+      }
+    });
+
+    await this.AddOrSelectPanel(resourceData);
+
+    // Also select the Data drawer item to keep UI consistent
+    const dataDrawerItem = this.drawerItems.find(item => item.text === 'Data');
+    if (dataDrawerItem) {
+      this.selectedDrawerItem = dataDrawerItem;
+      const index = this.drawerItems.indexOf(dataDrawerItem);
+      if (index >= 0) {
+        // Update the drawer UI
+        const ulElement = this.drawerWrapper?.nativeElement?.querySelector('ul');
+        if (ulElement) {
+          // Remove k-selected from all items
+          for (let i = 0; i < ulElement.children.length; ++i) {
+            this.renderer.removeClass(ulElement.children[i], 'k-selected');
+          }
+          // Add k-selected to the Data item
+          const liElement = ulElement.children[index];
+          if (liElement) {
+            this.renderer.addClass(liElement, 'k-selected');
+          }
+        }
+      }
+    }
+  }
+
+  private async addDefaultHomePanel(): Promise<void> {
+    const homeResourceData = new ResourceData({
+      ID: this.generatePanelId(),
+      Name: 'Home',
+      ResourceTypeID: 'drawer-item',
+      ResourceRecordID: '',
+      Configuration: {
+        path: '/home',
+        drawerItemType: 'Home',
+        isDrawerItem: true
+      }
+    });
+
+    await this.AddOrSelectPanel(homeResourceData);
+
+    // Also select the Home drawer item to keep the UI consistent
+    const homeDrawerItem = this.drawerItems.find(item => item.text === 'Home');
+    if (homeDrawerItem) {
+      this.selectedDrawerItem = homeDrawerItem;
+      this.selectDrawerItem(this.drawerItems.indexOf(homeDrawerItem));
+    }
   }
 
   protected setAppTitle(title: string = '') {
@@ -571,6 +796,13 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
   protected async AddOrSelectTab(data: ResourceData) {
     const t = this.tabs;
     this.loader = true;
+
+    // If using Golden Layout, handle panel creation differently
+    if (this.useGoldenLayout && this.goldenLayoutContainer) {
+      await this.AddOrSelectPanel(data);
+      this.loader = false;
+      return;
+    }
 
     const existingTab = this.findExistingTab(data);
 
@@ -763,24 +995,54 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   public async GetWorkspaceItemDisplayName(data: ResourceData): Promise<string> {
+    // Handle special drawer items first
+    const specialTypes: Record<string, string> = {
+      'Home': 'Home',
+      'Settings': 'Settings',
+      'AskSkip': 'Ask Skip',
+      'Lists': 'Lists',
+      'Files': 'Files'
+    };
+
+    if (specialTypes[data.ResourceType]) {
+      return specialTypes[data.ResourceType];
+    }
+
+    // Check for registered resource components
     const resourceReg = MJGlobal.Instance.ClassFactory.GetRegistration(BaseResourceComponent, data.ResourceType);
     if (resourceReg) {
       const resource = <BaseResourceComponent>new resourceReg.SubClass();
       return await resource.GetResourceDisplayName(data);
     }
-    else{
-      return `Workspace Item ${data.ID}`;
+    else {
+      // If we have a Name, use it; otherwise fall back to ID
+      return data.Name || `Workspace Item ${data.ID}`;
     }
   }
 
   public async GetWorkspaceItemIconClass(data: ResourceData): Promise<string> {
+    // Handle special drawer items first
+    const specialIcons: Record<string, string> = {
+      'Home': 'fa-solid fa-home',
+      'Settings': 'fa-solid fa-gear',
+      'AskSkip': 'fa-solid fa-robot',
+      'Lists': 'fa-solid fa-list',
+      'Files': 'fa-solid fa-folder'
+    };
+
+    if (specialIcons[data.ResourceType]) {
+      return specialIcons[data.ResourceType];
+    }
+
+    // Check for registered resource components
     const resourceReg = MJGlobal.Instance.ClassFactory.GetRegistration(BaseResourceComponent, data.ResourceType);
     if (resourceReg) {
       const resource = <BaseResourceComponent>new resourceReg.SubClass();
       return await resource.GetResourceIconClass(data);
     }
-    else{
-      return '';
+    else {
+      // Return the icon from data if available, otherwise empty
+      return data.ResourceIcon || '';
     }
   }
 
@@ -826,6 +1088,12 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
    */
   public async SaveSingleWorkspaceItem(tab: Tab): Promise<boolean> {
     try {
+      // Don't save drawer items (Home, Settings, etc.) as workspace items
+      if (tab.data?.Configuration?.isDrawerItem) {
+        console.log('Skipping workspace save for drawer item:', tab.data.Name);
+        return true; // Return success but don't actually save
+      }
+
       if (!this.workSpace)
         throw new Error('No workspace loaded');
 
@@ -837,11 +1105,15 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
       let wsItem: WorkspaceItemEntity;
       if (!tab.workspaceItem) {
         wsItem = await md.GetEntityObject<WorkspaceItemEntity>('Workspace Items');
-        if (tab.data.ID && tab.data.ID.length > 0)
+        // Only try to load if we have a valid workspace item ID (GUID format)
+        // Don't try to load with panel IDs like 'panel-1758142546839-o1ure7ktg'
+        const isValidGuid = tab.data.ID && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tab.data.ID);
+        if (isValidGuid) {
           await wsItem.Load(tab.data.ID);
+        }
         else {
+          // Create a new workspace item
           wsItem.NewRecord();
-
           wsItem.Name = tab.data.Name ? tab.data.Name : tab.data.ResourceType + ' Record:' + tab.data.ResourceRecordID;
           wsItem.WorkspaceID = this.workSpace.ID;
           wsItem.ResourceTypeID = tab.data?.ResourceTypeID;
@@ -891,9 +1163,152 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
         const tab = this.tabs[event.index - 1]; // subtract 1 because the event index includes the home tab and our data structure does not
         this.innerSelectTab(tab);
       }
-      else 
+      else
         this.innerSelectTab(null); // home
     }
+  }
+
+  // Golden Layout Methods
+  protected async AddOrSelectPanel(data: ResourceData): Promise<void> {
+    console.log('AddOrSelectPanel called with data:', data);
+    console.log('Resource Type:', data.ResourceType);
+    console.log('Resource Name:', data.Name);
+
+    // Check if a panel with this resource already exists
+    const existingPanel = this.goldenLayoutContainer?.findPanelByResource(data);
+
+    if (existingPanel) {
+      console.log('Found existing panel, focusing it');
+      // Focus the existing panel
+      this.goldenLayoutContainer.focusPanel(existingPanel.state.id || '');
+    } else {
+      console.log('Creating new panel');
+      // Register the PanelWrapperComponent if not already registered
+      this.goldenLayoutService.registerComponent('panel-wrapper', PanelWrapperComponent);
+
+      // Create panel state
+      // For drawer items, use generated ID. For real workspace items, leave ID empty initially
+      const panelId = data.Configuration?.isDrawerItem ? this.generatePanelId() : '';
+      const panelState: PanelComponentState = {
+        resourceData: data,
+        componentType: 'panel-wrapper',
+        label: await this.GetWorkspaceItemDisplayName(data),
+        icon: data.ResourceIcon || 'fa-solid fa-file',
+        id: panelId,
+        workspaceItemId: panelId  // Will be updated after save for real workspace items
+      };
+
+      console.log('Panel state created:', panelState);
+      console.log('Panel state resourceData:', panelState.resourceData);
+
+      // Add the panel to Golden Layout
+      this.goldenLayoutContainer.addPanel(panelState);
+
+      // Track the tab in our internal structure for compatibility
+      const newTab: Tab = {
+        id: panelState.id, // Initially empty for workspace items, generated for drawer items
+        label: panelState.label,
+        data: data,
+        labelLoading: false,
+        contentLoading: false,
+        icon: panelState.icon,
+        workspaceItem: null
+      };
+
+      // Only save to workspace if it's not a drawer item
+      // Drawer items (Home, Settings, etc.) are system navigation and shouldn't be persisted
+      if (!data.Configuration?.isDrawerItem) {
+        await this.SaveSingleWorkspaceItem(newTab);
+        // Update the panel state with the real workspace item ID after save
+        if (newTab.id && newTab.id !== panelState.id) {
+          panelState.id = newTab.id;
+          panelState.workspaceItemId = newTab.id;
+        }
+        this.tabs.push(newTab);
+      }
+      // For drawer items, we don't track them in tabs array since they're not workspace items
+    }
+  }
+
+  private generatePanelId(): string {
+    return `panel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private initializeGoldenLayout(): void {
+    if (this.goldenLayoutContainer) {
+      console.log('Golden Layout Container found, registering components');
+
+      // Register the PanelWrapper component
+      this.goldenLayoutService.registerComponent('panel-wrapper', PanelWrapperComponent);
+
+      // Don't add demo panels - real workspace items will be loaded
+      console.log('Golden Layout initialized, ready for workspace items');
+
+      // Check if the layout is empty and add Home panel as default
+      setTimeout(async () => {
+        const activePanels = this.goldenLayoutContainer.getActivePanels();
+        if (activePanels.length === 0) {
+          console.log('Golden Layout is empty, adding Home panel as default');
+          await this.addDefaultHomePanel();
+        }
+      }, 500); // Wait a bit to ensure workspace items have been loaded
+    } else {
+      console.error('Golden Layout Container not found!');
+    }
+  }
+
+  // Golden Layout Event Handlers
+  public async handleLayoutChanged(layout: ResolvedLayoutConfig): Promise<void> {
+    // Save layout to workspace when it changes
+    if (this.workSpace && this.goldenLayoutContainer) {
+      try {
+        // Store the layout configuration as a special workspace item
+        await this.saveLayoutConfiguration(layout);
+      } catch (error) {
+        console.error('Error saving layout configuration:', error);
+      }
+    }
+  }
+
+  private async saveLayoutConfiguration(layout: ResolvedLayoutConfig): Promise<void> {
+    // Don't save the layout configuration as a workspace item
+    // This was causing GUID conversion errors because ResourceTypeID is required
+    // Instead, we could store this in user preferences or a dedicated settings table
+    // For now, just log that we would save it
+    console.log('Golden Layout configuration would be saved:', layout);
+
+    // TODO: Implement proper storage mechanism for layout configuration
+    // Options:
+    // 1. Create a dedicated "Layout Configuration" resource type
+    // 2. Store in user preferences/settings
+    // 3. Use browser localStorage for per-user layout persistence
+  }
+
+  public handlePanelClosed(event: PanelClosedEvent): void {
+    // Handle panel closure
+    if (event.resourceData) {
+      // Find the tab associated with this panel
+      const tab = this.tabs.find(t => t.data?.ID === event.resourceData?.ID);
+      if (tab) {
+        this.closeTab(tab, 0);
+      }
+    }
+    event.done();
+  }
+
+  public handlePanelSelected(event: PanelSelectedEvent): void {
+    // Handle panel selection
+    if (event.resourceData) {
+      const tab = this.tabs.find(t => t.data?.ID === event.resourceData?.ID);
+      if (tab) {
+        this.setAppTitle(tab.label || '');
+        this.updateBrowserURL(tab, event.resourceData);
+      }
+    }
+  }
+
+  public handlePanelCreated(panel: PanelComponent): void {
+    // Panel was created, we can track it if needed
   }
 
   public async closeTab(tab: any, newTabIndex: number): Promise<void> {
@@ -977,29 +1392,69 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
   }
  
 
-  public onDrawerSelect(ev: DrawerSelectEvent): void {
+  public async onDrawerSelect(ev: DrawerSelectEvent): Promise<void> {
     this.selectedDrawerItem = ev.item;
-    this.router.navigate([ev.item.path])
-    this._mostRecentURL = ev.item.path;
 
-    // make sure that the first tab is selected since this is showing stuff in the Home/Nav tab
-    if (this.activeTabIndex !== 0) {
-      this.activeTabIndex = 0;
+    if (this.useGoldenLayout && this.goldenLayoutContainer) {
+      // In Golden Layout mode, create a panel for the drawer item
+      // For drawer items, store the type in the Configuration since ResourceType is computed from ResourceTypeID
+      // Map the drawer item text to a simple type string (not GUID)
+      const drawerTypeMap: Record<string, string> = {
+        'Home': 'Home',
+        'Settings': 'Settings',
+        'Ask Skip': 'AskSkip',
+        'Files': 'Files',
+        'Lists': 'Lists',
+        'Data': 'Data'
+      };
+      const drawerItemType = drawerTypeMap[ev.item.text] || ev.item.text;
+
+      console.log('onDrawerSelect - ev.item:', ev.item);
+      console.log('onDrawerSelect - drawerItemType:', drawerItemType);
+
+      const resourceData = new ResourceData({
+        ID: this.generatePanelId(),
+        Name: ev.item.text,
+        ResourceTypeID: 'drawer-item', // Special ID for drawer items
+        ResourceRecordID: '',
+        Configuration: {
+          path: ev.item.path,
+          drawerItemType: drawerItemType, // Store the actual type here (Home, Settings, etc.)
+          isDrawerItem: true
+        }
+      });
+
+      console.log('onDrawerSelect - resourceData Configuration:', resourceData.Configuration);
+
+      await this.AddOrSelectPanel(resourceData);
+      this.setAppTitle(ev.item.text);
+    } else {
+      // Original tab-based behavior
+      this.router.navigate([ev.item.path]);
+      this._mostRecentURL = ev.item.path;
+
+      // make sure that the first tab is selected since this is showing stuff in the Home/Nav tab
+      if (this.activeTabIndex !== 0) {
+        this.activeTabIndex = 0;
+      }
+
+      this.setAppTitle(ev.item.text);
     }
-
-    this.setAppTitle(ev.item.text);
   }
   
   protected get activeTabIndex(): number {
-    if (this.mjTabStrip)
+    if (!this.useGoldenLayout && this.mjTabStrip)
       return this.mjTabStrip.SelectedTabIndex;
+    else if (this.useGoldenLayout)
+      return 0; // In Golden Layout mode, return 0 to indicate we're not using tabs
     else
       return -1;
   }
 
   protected set activeTabIndex(index: number) {
-    if (this.mjTabStrip)
+    if (!this.useGoldenLayout && this.mjTabStrip)
       this.mjTabStrip.SelectedTabIndex = index;
+    // In Golden Layout mode, we don't set tab index
   }
 
   public getEntityItemFromViewItem(viewItem: DrawerItem): DrawerItem | null {

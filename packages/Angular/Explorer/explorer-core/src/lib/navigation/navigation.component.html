@@ -21,37 +21,52 @@
       </ng-template>    
     </kendo-drawer>
     <kendo-drawer-content>
-
-      <mj-tabstrip #mjTabstrip (TabClosed)="handleTabClosed($event)" (TabSelected)="handleTabSelected($event)" (TabContextMenu)="handleTabContextMenu($event)" (ResizeContainer)="sharedService.InvokeManualResize()">
-        <mj-tab [TabCloseable]="false">
-          Home
-        </mj-tab>
-        <mj-tab-body>
-          <router-outlet></router-outlet>
-        </mj-tab-body>
-
-        @for(tab of tabs; track tab.id; let i = $index) {
-          <mj-tab [TabCloseable]="true">
-            @if(tab?.contentLoading) {
-              <span class="fa-regular fa-clock tab-icon"></span>
-            }
-            @else if (tab?.icon) {
-              <span [class]="tab.icon + ' tab-icon'"></span>
-            }
-            {{ tab.labelLoading ? 'Loading...' : tab.label }}
+      @if (useGoldenLayout) {
+        <!-- Golden Layout Implementation -->
+        <mj-golden-layout-container
+          #goldenLayoutContainer
+          [fillWidth]="true"
+          [fillHeight]="true"
+          (layoutChanged)="handleLayoutChanged($event)"
+          (panelClosed)="handlePanelClosed($event)"
+          (panelSelected)="handlePanelSelected($event)"
+          (panelCreated)="handlePanelCreated($event)"
+          (resizeContainer)="sharedService.InvokeManualResize()">
+        </mj-golden-layout-container>
+      }
+      @else {
+        <!-- Original Tab Implementation -->
+        <mj-tabstrip #mjTabstrip (TabClosed)="handleTabClosed($event)" (TabSelected)="handleTabSelected($event)" (TabContextMenu)="handleTabContextMenu($event)" (ResizeContainer)="sharedService.InvokeManualResize()">
+          <mj-tab [TabCloseable]="false">
+            Home
           </mj-tab>
-        }
-        @for(tab of tabs; track tab.id; let i = $index) {
           <mj-tab-body>
-            <mj-resource [Data]="tab.data" [isVisible]="activeTabIndex - 1 === i"
-              (ResourceRecordSaved)="HandleResourceRecordSaved(tab, $event)"
-              (ContentLoadingStarted)="setTabContentLoadingStatus(tab, true)"
-              (ContentLoadingComplete)="setTabContentLoadingStatus(tab, false)"
-              class="tab-resource"
-            ></mj-resource>
-          </mj-tab-body>  
-        }
-      </mj-tabstrip>
+            <router-outlet></router-outlet>
+          </mj-tab-body>
+
+          @for(tab of tabs; track tab.id; let i = $index) {
+            <mj-tab [TabCloseable]="true">
+              @if(tab?.contentLoading) {
+                <span class="fa-regular fa-clock tab-icon"></span>
+              }
+              @else if (tab?.icon) {
+                <span [class]="tab.icon + ' tab-icon'"></span>
+              }
+              {{ tab.labelLoading ? 'Loading...' : tab.label }}
+            </mj-tab>
+          }
+          @for(tab of tabs; track tab.id; let i = $index) {
+            <mj-tab-body>
+              <mj-resource [Data]="tab.data" [isVisible]="activeTabIndex - 1 === i"
+                (ResourceRecordSaved)="HandleResourceRecordSaved(tab, $event)"
+                (ContentLoadingStarted)="setTabContentLoadingStatus(tab, true)"
+                (ContentLoadingComplete)="setTabContentLoadingStatus(tab, false)"
+                class="tab-resource"
+              ></mj-resource>
+            </mj-tab-body>
+          }
+        </mj-tabstrip>
+      }
     </kendo-drawer-content>
   </kendo-drawer-container>
 

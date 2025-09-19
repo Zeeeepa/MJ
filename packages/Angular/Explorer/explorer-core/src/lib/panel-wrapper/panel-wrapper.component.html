@@ -1,0 +1,36 @@
+<div class="panel-wrapper" [class.loading]="contentLoading">
+  @if (contentLoading) {
+    <div class="loading-overlay">
+      <div class="loading-spinner">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+      </div>
+    </div>
+  }
+
+  <!-- Container for dynamically loaded special components -->
+  <ng-container #dynamicComponentContainer></ng-container>
+
+  <!-- Show regular resource component if not a special component -->
+  @if (!shouldShowSpecialComponent) {
+    @if (Data && Data.ResourceType) {
+      <!-- Regular resource handling for entities and views -->
+      <mj-resource
+        [Data]="Data"
+        [isVisible]="isVisible"
+        (ResourceRecordSaved)="handleResourceRecordSaved($event)"
+        (ContentLoadingStarted)="handleContentLoadingStarted()"
+        (ContentLoadingComplete)="handleContentLoadingComplete()"
+        class="panel-resource">
+      </mj-resource>
+    }
+    @else {
+      <div class="empty-panel">
+        <i class="fa-regular fa-window-maximize fa-3x"></i>
+        <h3>Loading...</h3>
+        <p style="color: #666; font-size: 12px;">
+          Preparing content...
+        </p>
+      </div>
+    }
+  }
+</div>

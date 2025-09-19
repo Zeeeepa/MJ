@@ -1,0 +1,50 @@
+.golden-layout-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.golden-layout-wrapper.fill-width {
+  width: 100%;
+}
+
+.golden-layout-wrapper.fill-height {
+  height: 100vh;
+}
+
+.golden-layout-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+}
+
+/* Minimal overrides - let Golden Layout handle most styling */
+:host ::ng-deep .lm_content {
+  background: #ffffff;
+  overflow: auto;
+}
+
+/* Simple theme adjustments */
+:host ::ng-deep .lm_header {
+  background: #f0f0f0;
+  border-bottom: 1px solid #ddd;
+}
+
+:host ::ng-deep .lm_tab.lm_active {
+  background: #fff;
+  border-bottom: 2px solid #007bff;
+}
+
+:host ::ng-deep .lm_splitter {
+  background: #ddd;
+}
+
+:host ::ng-deep .lm_splitter:hover {
+  background: #999;
+}
