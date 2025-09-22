@@ -192,8 +192,14 @@ export class GoldenLayoutService {
       const panelData = panel.state.resourceData;
       if (!panelData) continue;
 
+      // For resource browsers (Dashboards, Reports, Queries browser panels)
+      if (resourceData.Configuration?.isResourceBrowser && panelData.Configuration?.isResourceBrowser) {
+        if (panelData.ResourceTypeID === resourceData.ResourceTypeID) {
+          return panel;
+        }
+      }
       // For drawer items, match by drawerItemType
-      if (resourceData.Configuration?.isDrawerItem && panelData.Configuration?.isDrawerItem) {
+      else if (resourceData.Configuration?.isDrawerItem && panelData.Configuration?.isDrawerItem) {
         if (panelData.Configuration.drawerItemType === resourceData.Configuration.drawerItemType) {
           return panel;
         }
@@ -340,6 +346,8 @@ export class GoldenLayoutService {
 
     console.log('GoldenLayout createComponent - dataToSet:', dataToSet);
     console.log('GoldenLayout createComponent - dataToSet Configuration:', dataToSet?.Configuration);
+    console.log('GoldenLayout createComponent - isResourceBrowser:', dataToSet?.Configuration?.isResourceBrowser);
+    console.log('GoldenLayout createComponent - resourceTypeName:', dataToSet?.Configuration?.resourceTypeName);
 
     // Try using setInput if available (Angular 14+)
     if (typeof componentRef.setInput === 'function') {

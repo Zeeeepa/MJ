@@ -8,6 +8,9 @@ import { FilesComponent } from '../files/files.component';
 import { ListViewComponent } from '../list-view/list-view.component';
 import { DataBrowserComponent } from '../data-browser-component/data-browser.component';
 import { SingleApplicationComponent } from '../single-application/single-application.component';
+import { DashboardBrowserComponent } from '../dashboard-browser-component/dashboard-browser.component';
+import { ReportBrowserComponent } from '../report-browser-component/report-browser.component';
+import { QueryBrowserComponent } from '../query-browser-component/query-browser.component';
 
 /**
  * Wrapper component for panel content in Golden Layout.
@@ -43,14 +46,22 @@ export class PanelWrapperComponent implements OnInit, OnDestroy {
     console.log('PanelWrapper ngOnInit - ResourceType:', this.Data?.ResourceType);
     console.log('PanelWrapper ngOnInit - ResourceTypeID:', this.Data?.ResourceTypeID);
 
+    // Check if this is a resource browser (Dashboards, Reports, Queries)
+    const isResourceBrowser = this.Data?.Configuration?.isResourceBrowser;
     // Check if this is a drawer item (special component) or regular resource
     const isDrawerItem = this.Data?.Configuration?.isDrawerItem;
     const drawerItemType = this.Data?.Configuration?.drawerItemType;
 
+    console.log('PanelWrapper ngOnInit - isResourceBrowser:', isResourceBrowser);
     console.log('PanelWrapper ngOnInit - isDrawerItem:', isDrawerItem);
     console.log('PanelWrapper ngOnInit - drawerItemType:', drawerItemType);
 
-    if (isDrawerItem && drawerItemType) {
+    if (isResourceBrowser) {
+      console.log('Loading browser component for resource type:', this.Data?.ResourceType);
+      console.log('Configuration resourceTypeName:', this.Data?.Configuration?.resourceTypeName);
+      // Load the appropriate browser component
+      this.loadBrowserComponent();
+    } else if (isDrawerItem && drawerItemType) {
       console.log('Loading special component for drawer item:', drawerItemType);
       // For drawer items, load the special component based on drawerItemType
       this.loadSpecialComponentByType(drawerItemType);
@@ -69,10 +80,15 @@ export class PanelWrapperComponent implements OnInit, OnDestroy {
         console.log('Retry - Data:', this.Data);
         console.log('Retry - Configuration:', this.Data?.Configuration);
 
+        const isResourceBrowser = this.Data?.Configuration?.isResourceBrowser;
         const isDrawerItem = this.Data?.Configuration?.isDrawerItem;
         const drawerItemType = this.Data?.Configuration?.drawerItemType;
 
-        if (isDrawerItem && drawerItemType) {
+        if (isResourceBrowser) {
+          console.log('Retry - Loading browser component for resource type:', this.Data?.ResourceType);
+          console.log('Retry - Configuration resourceTypeName:', this.Data?.Configuration?.resourceTypeName);
+          this.loadBrowserComponent();
+        } else if (isDrawerItem && drawerItemType) {
           console.log('Retry - Loading special component for drawer item:', drawerItemType);
           this.loadSpecialComponentByType(drawerItemType);
         } else if (this.Data?.ResourceType) {
@@ -93,6 +109,56 @@ export class PanelWrapperComponent implements OnInit, OnDestroy {
           }, 50);
         }
       }, 100);
+    }
+  }
+
+  private loadBrowserComponent(): void {
+    // Map resource types to their browser components
+    const browserComponentMap: Record<string, Type<any>> = {
+      'Dashboards': DashboardBrowserComponent,
+      'Reports': ReportBrowserComponent,
+      'Queries': QueryBrowserComponent
+    };
+
+    // Try to get resource type name from either computed property or configuration
+    const resourceTypeName = this.Data?.ResourceType || this.Data?.Configuration?.resourceTypeName;
+    console.log('loadBrowserComponent - resourceTypeName:', resourceTypeName);
+
+    const componentType = browserComponentMap[resourceTypeName];
+
+    if (componentType) {
+      console.log('Loading browser component for:', resourceTypeName);
+      this.shouldShowSpecialComponent = true;
+      // Don't set contentLoading for browser components - they manage their own loading state
+      this.contentLoading = false;
+
+      // Create the browser component dynamically
+      setTimeout(async () => {
+        if (this.dynamicComponentContainer) {
+          this.dynamicComponentContainer.clear();
+          this.componentRef = this.dynamicComponentContainer.createComponent(componentType);
+
+          // Initialize the component if it has an ngOnInit method
+          if (this.componentRef.instance && typeof this.componentRef.instance.ngOnInit === 'function') {
+            try {
+              await this.componentRef.instance.ngOnInit();
+            } catch (error) {
+              console.error('Error initializing browser component:', error);
+            }
+          }
+
+          this.cdr.detectChanges();
+        }
+      }, 0);
+    } else {
+      console.log('No browser component found for resource type:', resourceTypeName);
+      console.log('Available browser components:', Object.keys(browserComponentMap));
+      // Fall back to regular resource component
+      this.shouldShowSpecialComponent = false;
+      setTimeout(() => {
+        this.isVisible = true;
+        this.cdr.detectChanges();
+      }, 50);
     }
   }
 
@@ -124,10 +190,13 @@ export class PanelWrapperComponent implements OnInit, OnDestroy {
       }, 0);
     } else {
       console.log('No special component for ResourceType:', this.Data!.ResourceType, '- will use mj-resource');
-      // No special component, use regular mj-resource
+      console.log('ResourceTypeID:', this.Data!.ResourceTypeID);
+      console.log('Full Data object:', this.Data);
+      // No special component, use regular mj-resource (for Dashboards, Reports, Queries, Views, etc.)
       this.shouldShowSpecialComponent = false;
       // Trigger visibility to load the resource component
       setTimeout(() => {
+        console.log('Setting isVisible to true for resource component');
         this.isVisible = true;
         this.cdr.detectChanges();
       }, 50);

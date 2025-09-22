@@ -1,5 +1,5 @@
 <div class="panel-wrapper" [class.loading]="contentLoading">
-  @if (contentLoading) {
+  @if (contentLoading && !Data?.Configuration?.isResourceBrowser) {
     <div class="loading-overlay">
       <div class="loading-spinner">
         <i class="fa-solid fa-spinner fa-spin"></i>
@@ -12,7 +12,7 @@
 
   <!-- Show regular resource component if not a special component -->
   @if (!shouldShowSpecialComponent) {
-    @if (Data && Data.ResourceType) {
+    @if (Data && Data.ResourceTypeID) {
       <!-- Regular resource handling for entities and views -->
       <mj-resource
         [Data]="Data"

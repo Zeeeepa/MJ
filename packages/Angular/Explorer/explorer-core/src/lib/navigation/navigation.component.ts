@@ -6,7 +6,7 @@ import { Metadata, ApplicationInfo, EntityInfo, RunView, RunViewParams, LogError
 import { MJEvent, MJEventType, MJGlobal } from '@memberjunction/global';
 import { Subscription } from 'rxjs';
 import { EventCodes, SharedService } from '@memberjunction/ng-shared';
-import { WorkspaceEntity, WorkspaceItemEntity, UserViewEntityExtended, ViewInfo } from '@memberjunction/core-entities';
+import { WorkspaceEntity, WorkspaceItemEntity, UserViewEntityExtended, ViewInfo, ResourceTypeEntity } from '@memberjunction/core-entities';
 import { BaseResourceComponent } from '@memberjunction/ng-shared';
 import { ResourceData } from '@memberjunction/core-entities';
 
@@ -78,6 +78,9 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Feature flag to enable Golden Layout
   public useGoldenLayout: boolean = true; // Set to true to enable Golden Layout
+
+  // Queue for panels that need to be added once Golden Layout is ready
+  private pendingPanels: ResourceData[] = [];
 
   @HostListener('window:resize')
   onWindowResize(): void {
@@ -1088,9 +1091,19 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
    */
   public async SaveSingleWorkspaceItem(tab: Tab): Promise<boolean> {
     try {
-      // Don't save drawer items (Home, Settings, etc.) as workspace items
-      if (tab.data?.Configuration?.isDrawerItem) {
-        console.log('Skipping workspace save for drawer item:', tab.data.Name);
+      // Check if ResourceTypeID is a valid GUID
+      const resourceTypeID = tab.data?.ResourceTypeID;
+      const isValidGuid = resourceTypeID && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resourceTypeID);
+
+      // Don't save items that shouldn't be persisted to workspace
+      const isDrawerItem = tab.data?.Configuration?.isDrawerItem;
+      const isResourceBrowser = tab.data?.Configuration?.isResourceBrowser;
+
+      if (!isValidGuid || isDrawerItem || isResourceBrowser) {
+        console.log('Skipping workspace save for non-saveable item:', tab.data?.Name,
+                   'ResourceTypeID:', resourceTypeID,
+                   'isDrawerItem:', isDrawerItem,
+                   'isResourceBrowser:', isResourceBrowser);
         return true; // Return success but don't actually save
       }
 
@@ -1174,6 +1187,15 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
     console.log('Resource Type:', data.ResourceType);
     console.log('Resource Name:', data.Name);
 
+    // Wait for Golden Layout to be initialized if it's not ready yet
+    if (!this.goldenLayoutContainer) {
+      console.log('Golden Layout container not ready, waiting for initialization...');
+      // Queue this panel to be added once Golden Layout is ready
+      this.pendingPanels = this.pendingPanels || [];
+      this.pendingPanels.push(data);
+      return;
+    }
+
     // Check if a panel with this resource already exists
     const existingPanel = this.goldenLayoutContainer?.findPanelByResource(data);
 
@@ -1243,6 +1265,18 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
 
       // Don't add demo panels - real workspace items will be loaded
       console.log('Golden Layout initialized, ready for workspace items');
+
+      // Process any pending panels that were queued before Golden Layout was ready
+      if (this.pendingPanels && this.pendingPanels.length > 0) {
+        console.log(`Processing ${this.pendingPanels.length} pending panels`);
+        const pendingPanelsCopy = [...this.pendingPanels];
+        this.pendingPanels = []; // Clear the queue
+
+        // Process each pending panel
+        pendingPanelsCopy.forEach(async (data) => {
+          await this.AddOrSelectPanel(data);
+        });
+      }
 
       // Check if the layout is empty and add Home panel as default
       setTimeout(async () => {
@@ -1393,13 +1427,14 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
  
 
   public async onDrawerSelect(ev: DrawerSelectEvent): Promise<void> {
+    console.log('onDrawerSelect called with event:', ev);
+    console.log('onDrawerSelect - item text:', ev.item?.text);
+
     this.selectedDrawerItem = ev.item;
 
     if (this.useGoldenLayout && this.goldenLayoutContainer) {
-      // In Golden Layout mode, create a panel for the drawer item
-      // For drawer items, store the type in the Configuration since ResourceType is computed from ResourceTypeID
-      // Map the drawer item text to a simple type string (not GUID)
-      const drawerTypeMap: Record<string, string> = {
+      // Check if this is a special drawer item or a regular resource type
+      const specialDrawerItems: Record<string, string> = {
         'Home': 'Home',
         'Settings': 'Settings',
         'Ask Skip': 'AskSkip',
@@ -1407,27 +1442,69 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
         'Lists': 'Lists',
         'Data': 'Data'
       };
-      const drawerItemType = drawerTypeMap[ev.item.text] || ev.item.text;
+
+      const isSpecialDrawerItem = ev.item.text in specialDrawerItems;
 
       console.log('onDrawerSelect - ev.item:', ev.item);
-      console.log('onDrawerSelect - drawerItemType:', drawerItemType);
+      console.log('onDrawerSelect - isSpecialDrawerItem:', isSpecialDrawerItem);
 
-      const resourceData = new ResourceData({
-        ID: this.generatePanelId(),
-        Name: ev.item.text,
-        ResourceTypeID: 'drawer-item', // Special ID for drawer items
-        ResourceRecordID: '',
-        Configuration: {
-          path: ev.item.path,
-          drawerItemType: drawerItemType, // Store the actual type here (Home, Settings, etc.)
-          isDrawerItem: true
+      if (isSpecialDrawerItem) {
+        // Special drawer items (Home, Settings, Data, etc.)
+        const drawerItemType = specialDrawerItems[ev.item.text];
+        console.log('onDrawerSelect - drawerItemType:', drawerItemType);
+
+        const resourceData = new ResourceData({
+          ID: this.generatePanelId(),
+          Name: ev.item.text,
+          ResourceTypeID: 'drawer-item', // Special ID for drawer items
+          ResourceRecordID: '',
+          Configuration: {
+            path: ev.item.path,
+            drawerItemType: drawerItemType, // Store the actual type here (Home, Settings, etc.)
+            isDrawerItem: true
+          }
+        });
+
+        console.log('onDrawerSelect - resourceData Configuration:', resourceData.Configuration);
+        await this.AddOrSelectPanel(resourceData);
+        this.setAppTitle(ev.item.text);
+      } else {
+        // Regular resource types (Dashboards, Reports, Queries, etc.)
+        // These should open a browser panel to select a specific resource
+        console.log('onDrawerSelect - Looking for resource type with name:', ev.item.text);
+
+        // Try to find resource type by exact name match
+        const rt = this.sharedService.ResourceTypeByName(ev.item.text);
+        console.log('onDrawerSelect - Resource Type found:', rt);
+
+        if (rt) {
+          // Create resource data for a browser panel
+          const resourceData = new ResourceData({
+            ID: this.generatePanelId(),
+            Name: ev.item.text,
+            ResourceTypeID: rt.ID,
+            ResourceRecordID: null, // No specific record, this will open the browser
+            Configuration: {
+              path: ev.item.path,
+              isResourceBrowser: true, // Flag to indicate this should open a browser component
+              resourceTypeName: rt.Name // Store the actual resource type name
+            }
+          });
+
+          console.log('onDrawerSelect - Browser resourceData:', resourceData);
+          console.log('onDrawerSelect - ResourceType from ResourceData:', resourceData.ResourceType);
+          console.log('onDrawerSelect - Configuration:', resourceData.Configuration);
+          console.log('onDrawerSelect - isResourceBrowser:', resourceData.Configuration?.isResourceBrowser);
+          console.log('onDrawerSelect - resourceTypeName:', resourceData.Configuration?.resourceTypeName);
+          await this.AddOrSelectPanel(resourceData);
+          this.setAppTitle(ev.item.text);
+        } else {
+          console.error('Resource type not found for:', ev.item.text);
+          // Log all available resource types for debugging
+          const allTypes = this.sharedService.ResourceTypes;
+          console.log('Available resource types:', allTypes.map((t: ResourceTypeEntity) => t.Name));
         }
-      });
-
-      console.log('onDrawerSelect - resourceData Configuration:', resourceData.Configuration);
-
-      await this.AddOrSelectPanel(resourceData);
-      this.setAppTitle(ev.item.text);
+      }
     } else {
       // Original tab-based behavior
       this.router.navigate([ev.item.path]);
@@ -1522,6 +1599,8 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
     this.drawerItems.length = 0; // clear the array
 
     const items = md.VisibleExplorerNavigationItems.filter(item => item.ShowInNavigationDrawer);
+    console.log('LoadDrawer - VisibleExplorerNavigationItems:', items);
+
     items.forEach(item => {
       const drawerItem = {
         id: item.ID,
@@ -1530,8 +1609,12 @@ export class NavigationComponent implements OnInit, OnDestroy, AfterViewInit {
         path: item.Route,
         icon: item.IconCSSClass
       }
+      console.log('LoadDrawer - Adding drawer item:', drawerItem);
       this.drawerItems.push(drawerItem);
     });
+
+    console.log('LoadDrawer - Total drawer items:', this.drawerItems.length);
+    console.log('LoadDrawer - Drawer items:', this.drawerItems);
 
     this.loading = false;
   }
