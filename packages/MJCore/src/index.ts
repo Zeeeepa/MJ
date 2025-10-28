@@ -30,6 +30,7 @@ export * from "./generic/compositeKey";
 export * from "./generic/authEvaluator";
 export * from "./generic/metadataUtil";
 export * from "./generic/authTypes";
+export * from "./generic/graphqlTypeNames";
 
 export * from "./generic/databaseProviderBase";
 
