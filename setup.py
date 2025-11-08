@@ -493,67 +493,367 @@ class ConfigurationWizard:
     """Interactive configuration wizard."""
     
     @staticmethod
+    def _get_input(prompt: str, default: str = "", required: bool = False, secret: bool = False) -> str:
+        """Get user input with required/optional indication."""
+        required_text = f"{Colors.RED}[REQUIRED]{Colors.ENDC}" if required else f"{Colors.YELLOW}[OPTIONAL]{Colors.ENDC}"
+        default_text = f" [{default}]" if default else ""
+        full_prompt = f"{Colors.CYAN}{prompt}{default_text} {required_text}: {Colors.ENDC}"
+        
+        if secret:
+            import getpass
+            value = getpass.getpass(full_prompt)
+        else:
+            value = input(full_prompt).strip()
+        
+        if not value and required and not default:
+            Logger.error(f"This field is required!")
+            return ConfigurationWizard._get_input(prompt, default, required, secret)
+        
+        return value or default
+    
+    @staticmethod
     def run() -> Dict:
         """Run the configuration wizard."""
-        Logger.header("🔧 Configuration Wizard")
-        Logger.info("Enter your configuration details. Press Enter for defaults.")
+        Logger.header("🔧 Interactive Configuration Wizard")
+        Logger.info("This wizard will guide you through configuring MemberJunction.")
+        Logger.info(f"{Colors.RED}[REQUIRED]{Colors.ENDC} = Must be provided")
+        Logger.info(f"{Colors.YELLOW}[OPTIONAL]{Colors.ENDC} = Can be skipped (press Enter)")
+        Logger.info("\nFor password fields, input will be hidden for security.\n")
         
         config = {}
         
-        # Database configuration
-        Logger.info("\n--- Database Configuration ---")
-        config['dbUrl'] = input(f"{Colors.CYAN}Database Host [localhost]: {Colors.ENDC}").strip() or "localhost"
-        config['dbPort'] = int(input(f"{Colors.CYAN}Database Port [1433]: {Colors.ENDC}").strip() or "1433")
-        config['dbDatabase'] = input(f"{Colors.CYAN}Database Name [MJ_Production]: {Colors.ENDC}").strip() or "MJ_Production"
-        config['dbInstance'] = input(f"{Colors.CYAN}Database Instance (leave empty for default): {Colors.ENDC}").strip()
-        config['dbTrustServerCertificate'] = input(f"{Colors.CYAN}Trust Server Certificate? [Y/n]: {Colors.ENDC}").strip() or "Y"
+        # ===== DATABASE CONFIGURATION =====
+        Logger.header("\n" + "="*60)
+        Logger.header("DATABASE CONFIGURATION")
+        Logger.header("="*60)
+        Logger.info("Configure connection to your SQL Server database.")
+        Logger.info("This is where MemberJunction will store all data.\n")
         
-        # Database credentials
-        Logger.info("\n--- Database Credentials ---")
-        config['codeGenLogin'] = input(f"{Colors.CYAN}CodeGen Username [codegen_user]: {Colors.ENDC}").strip() or "codegen_user"
-        config['codeGenPwD'] = input(f"{Colors.CYAN}CodeGen Password: {Colors.ENDC}").strip()
-        config['mjAPILogin'] = input(f"{Colors.CYAN}MJAPI Username [mjapi_user]: {Colors.ENDC}").strip() or "mjapi_user"
-        config['mjAPIPwD'] = input(f"{Colors.CYAN}MJAPI Password: {Colors.ENDC}").strip()
+        config['dbUrl'] = ConfigurationWizard._get_input(
+            "Database Host (IP or hostname)", 
+            default="localhost", 
+            required=True
+        )
         
-        # GraphQL configuration
-        Logger.info("\n--- GraphQL Configuration ---")
-        config['graphQLPort'] = int(input(f"{Colors.CYAN}GraphQL Port [4000]: {Colors.ENDC}").strip() or "4000")
+        config['dbPort'] = int(ConfigurationWizard._get_input(
+            "Database Port", 
+            default="1433", 
+            required=True
+        ))
         
-        # Authentication configuration
-        Logger.info("\n--- Authentication Configuration ---")
-        Logger.info("Choose authentication type: MSAL (Azure AD) or Auth0")
-        auth_type = input(f"{Colors.CYAN}Auth Type [MSAL/Auth0]: {Colors.ENDC}").strip().upper()
+        config['dbDatabase'] = ConfigurationWizard._get_input(
+            "Database Name", 
+            default="MJ_Production", 
+            required=True
+        )
+        
+        config['dbInstance'] = ConfigurationWizard._get_input(
+            "Database Instance (named instance, if applicable)", 
+            default="", 
+            required=False
+        )
+        
+        trust_cert = ConfigurationWizard._get_input(
+            "Trust Server Certificate? (Y/n)", 
+            default="Y", 
+            required=False
+        )
+        config['dbTrustServerCertificate'] = trust_cert.upper() if trust_cert else "Y"
+        
+        # ===== DATABASE CREDENTIALS =====
+        Logger.header("\n" + "="*60)
+        Logger.header("DATABASE CREDENTIALS")
+        Logger.header("="*60)
+        Logger.info("Two database users are needed:")
+        Logger.info("  1. CodeGen User: Needs elevated permissions (db_owner) for schema changes")
+        Logger.info("  2. MJAPI User: Runtime user with read/write permissions only\n")
+        
+        Logger.info("--- CodeGen User (Elevated Permissions) ---")
+        config['codeGenLogin'] = ConfigurationWizard._get_input(
+            "CodeGen Username", 
+            default="codegen_user", 
+            required=True
+        )
+        
+        config['codeGenPwD'] = ConfigurationWizard._get_input(
+            "CodeGen Password", 
+            default="", 
+            required=True,
+            secret=True
+        )
+        
+        Logger.info("\n--- MJAPI Runtime User (Standard Permissions) ---")
+        config['mjAPILogin'] = ConfigurationWizard._get_input(
+            "MJAPI Username", 
+            default="mjapi_user", 
+            required=True
+        )
+        
+        config['mjAPIPwD'] = ConfigurationWizard._get_input(
+            "MJAPI Password", 
+            default="", 
+            required=True,
+            secret=True
+        )
+        
+        # ===== GRAPHQL SERVER CONFIGURATION =====
+        Logger.header("\n" + "="*60)
+        Logger.header("GRAPHQL SERVER CONFIGURATION")
+        Logger.header("="*60)
+        Logger.info("Configure the GraphQL API server settings.\n")
+        
+        config['graphQLPort'] = int(ConfigurationWizard._get_input(
+            "GraphQL Server Port", 
+            default="4000", 
+            required=True
+        ))
+        
+        # ===== AUTHENTICATION CONFIGURATION =====
+        Logger.header("\n" + "="*60)
+        Logger.header("AUTHENTICATION CONFIGURATION")
+        Logger.header("="*60)
+        Logger.info("MemberJunction supports multiple authentication providers:")
+        Logger.info("  • MSAL (Microsoft Azure Active Directory) - Recommended for Microsoft 365 users")
+        Logger.info("  • Auth0 - Flexible authentication platform")
+        Logger.info("  • Okta - Enterprise identity management (configure manually later)")
+        Logger.info("  • AWS Cognito - AWS-based authentication (configure manually later)")
+        Logger.info("  • Google OAuth - Google authentication (configure manually later)\n")
+        
+        auth_type = ConfigurationWizard._get_input(
+            "Primary Auth Type (MSAL/Auth0)", 
+            default="MSAL", 
+            required=True
+        ).upper()
+        
         config['authType'] = auth_type if auth_type in ['MSAL', 'AUTH0'] else 'MSAL'
         
         if config['authType'] == 'MSAL':
-            config['msalWebClientId'] = input(f"{Colors.CYAN}MSAL Client ID: {Colors.ENDC}").strip()
-            config['msalTenantId'] = input(f"{Colors.CYAN}MSAL Tenant ID: {Colors.ENDC}").strip()
+            Logger.info("\n--- Microsoft Azure AD (MSAL) Configuration ---")
+            Logger.info("To get these values:")
+            Logger.info("  1. Go to Azure Portal > Azure Active Directory > App Registrations")
+            Logger.info("  2. Create a new registration (if needed)")
+            Logger.info("  3. Note the Application (client) ID and Directory (tenant) ID")
+            Logger.info("  4. Add redirect URI: http://localhost:4200\n")
+            
+            config['msalWebClientId'] = ConfigurationWizard._get_input(
+                "MSAL Application (Client) ID", 
+                default="", 
+                required=True
+            )
+            
+            config['msalTenantId'] = ConfigurationWizard._get_input(
+                "MSAL Directory (Tenant) ID", 
+                default="", 
+                required=True
+            )
+            
             config['auth0ClientId'] = ""
             config['auth0ClientSecret'] = ""
             config['auth0Domain'] = ""
-        else:
-            config['auth0Domain'] = input(f"{Colors.CYAN}Auth0 Domain: {Colors.ENDC}").strip()
-            config['auth0ClientId'] = input(f"{Colors.CYAN}Auth0 Client ID: {Colors.ENDC}").strip()
-            config['auth0ClientSecret'] = input(f"{Colors.CYAN}Auth0 Client Secret: {Colors.ENDC}").strip()
+            
+        else:  # Auth0
+            Logger.info("\n--- Auth0 Configuration ---")
+            Logger.info("To get these values:")
+            Logger.info("  1. Go to auth0.com and create an account (if needed)")
+            Logger.info("  2. Create a new application")
+            Logger.info("  3. Note the Domain, Client ID, and Client Secret")
+            Logger.info("  4. Add Allowed Callback URL: http://localhost:4200/callback\n")
+            
+            config['auth0Domain'] = ConfigurationWizard._get_input(
+                "Auth0 Domain (e.g., your-tenant.auth0.com)", 
+                default="", 
+                required=True
+            )
+            
+            config['auth0ClientId'] = ConfigurationWizard._get_input(
+                "Auth0 Client ID", 
+                default="", 
+                required=True
+            )
+            
+            config['auth0ClientSecret'] = ConfigurationWizard._get_input(
+                "Auth0 Client Secret", 
+                default="", 
+                required=True,
+                secret=True
+            )
+            
             config['msalWebClientId'] = ""
             config['msalTenantId'] = ""
         
-        # User creation
-        Logger.info("\n--- Initial User Setup ---")
-        create_user = input(f"{Colors.CYAN}Create initial admin user? [Y/n]: {Colors.ENDC}").strip() or "Y"
-        config['createNewUser'] = create_user
+        # ===== INITIAL ADMIN USER =====
+        Logger.header("\n" + "="*60)
+        Logger.header("INITIAL ADMIN USER SETUP")
+        Logger.header("="*60)
+        Logger.info("Create the first admin user for accessing MemberJunction.\n")
         
-        if create_user.upper() == 'Y':
-            config['userEmail'] = input(f"{Colors.CYAN}User Email: {Colors.ENDC}").strip()
-            config['userFirstName'] = input(f"{Colors.CYAN}First Name: {Colors.ENDC}").strip()
-            config['userLastName'] = input(f"{Colors.CYAN}Last Name: {Colors.ENDC}").strip()
-            config['userName'] = input(f"{Colors.CYAN}Username: {Colors.ENDC}").strip()
+        create_user = ConfigurationWizard._get_input(
+            "Create initial admin user? (Y/n)", 
+            default="Y", 
+            required=False
+        )
         
-        # AI API Keys (optional)
-        Logger.info("\n--- AI Configuration (Optional) ---")
-        config['openAIAPIKey'] = input(f"{Colors.CYAN}OpenAI API Key (optional): {Colors.ENDC}").strip()
-        config['anthropicAPIKey'] = input(f"{Colors.CYAN}Anthropic API Key (optional): {Colors.ENDC}").strip()
-        config['mistralAPIKey'] = input(f"{Colors.CYAN}Mistral API Key (optional): {Colors.ENDC}").strip()
+        config['createNewUser'] = create_user.upper() if create_user else "Y"
+        
+        if config['createNewUser'].upper() == 'Y':
+            config['userEmail'] = ConfigurationWizard._get_input(
+                "Admin User Email", 
+                default="", 
+                required=True
+            )
+            
+            config['userFirstName'] = ConfigurationWizard._get_input(
+                "Admin User First Name", 
+                default="", 
+                required=True
+            )
+            
+            config['userLastName'] = ConfigurationWizard._get_input(
+                "Admin User Last Name", 
+                default="", 
+                required=True
+            )
+            
+            config['userName'] = ConfigurationWizard._get_input(
+                "Admin Username", 
+                default=config['userEmail'].split('@')[0] if '@' in config['userEmail'] else "admin", 
+                required=True
+            )
+        else:
+            config['userEmail'] = ""
+            config['userFirstName'] = ""
+            config['userLastName'] = ""
+            config['userName'] = ""
+        
+        # ===== AI PROVIDER API KEYS (OPTIONAL) =====
+        Logger.header("\n" + "="*60)
+        Logger.header("AI PROVIDER CONFIGURATION (Optional)")
+        Logger.header("="*60)
+        Logger.info("MemberJunction integrates with 15+ AI providers for enhanced functionality.")
+        Logger.info("You can configure these now or add them later via environment variables.")
+        Logger.info("Supported providers: OpenAI, Anthropic, Google, Mistral, Cohere, and more.\n")
+        
+        configure_ai = ConfigurationWizard._get_input(
+            "Configure AI providers now? (y/N)", 
+            default="N", 
+            required=False
+        )
+        
+        if configure_ai.upper() == 'Y':
+            Logger.info("\n--- OpenAI Configuration ---")
+            Logger.info("For GPT-4, GPT-3.5, DALL-E, Whisper, and embeddings")
+            Logger.info("Get API key from: https://platform.openai.com/api-keys\n")
+            config['openAIAPIKey'] = ConfigurationWizard._get_input(
+                "OpenAI API Key (sk-...)", 
+                default="", 
+                required=False,
+                secret=True
+            )
+            
+            Logger.info("\n--- Anthropic Configuration ---")
+            Logger.info("For Claude models (Claude 3.5 Sonnet, Claude 3 Opus, etc.)")
+            Logger.info("Get API key from: https://console.anthropic.com/\n")
+            config['anthropicAPIKey'] = ConfigurationWizard._get_input(
+                "Anthropic API Key (sk-ant-...)", 
+                default="", 
+                required=False,
+                secret=True
+            )
+            
+            Logger.info("\n--- Mistral AI Configuration ---")
+            Logger.info("For Mistral models (Mistral Large, Mistral Medium, etc.)")
+            Logger.info("Get API key from: https://console.mistral.ai/\n")
+            config['mistralAPIKey'] = ConfigurationWizard._get_input(
+                "Mistral API Key", 
+                default="", 
+                required=False,
+                secret=True
+            )
+            
+            Logger.info("\n--- Google AI Configuration ---")
+            Logger.info("For Gemini models and Google AI services")
+            Logger.info("Get API key from: https://makersuite.google.com/app/apikey\n")
+            config['googleAPIKey'] = ConfigurationWizard._get_input(
+                "Google AI API Key", 
+                default="", 
+                required=False,
+                secret=True
+            )
+            
+            Logger.info("\n--- Additional AI Providers ---")
+            Logger.info("Other providers (Cohere, Azure OpenAI, etc.) can be configured via environment variables")
+            Logger.info("See INSTRUCTIONS.md for details on all supported providers\n")
+        else:
+            config['openAIAPIKey'] = ""
+            config['anthropicAPIKey'] = ""
+            config['mistralAPIKey'] = ""
+            config['googleAPIKey'] = ""
+        
+        # ===== ADDITIONAL OPTIONAL SETTINGS =====
+        Logger.header("\n" + "="*60)
+        Logger.header("ADDITIONAL SETTINGS (Optional)")
+        Logger.header("="*60)
+        Logger.info("Additional configuration options for advanced users.\n")
+        
+        configure_advanced = ConfigurationWizard._get_input(
+            "Configure advanced settings? (y/N)", 
+            default="N", 
+            required=False
+        )
+        
+        if configure_advanced.upper() == 'Y':
+            Logger.info("\n--- MCP Server Configuration ---")
+            Logger.info("Model Context Protocol server for AI agent integration")
+            config['mcpServerPort'] = int(ConfigurationWizard._get_input(
+                "MCP Server Port", 
+                default="3100", 
+                required=False
+            ) or "3100")
+            
+            Logger.info("\n--- A2A Server Configuration ---")
+            Logger.info("Agent-to-Agent communication server")
+            config['a2aServerPort'] = int(ConfigurationWizard._get_input(
+                "A2A Server Port", 
+                default="3200", 
+                required=False
+            ) or "3200")
+            
+            Logger.info("\n--- Logging Configuration ---")
+            config['logLevel'] = ConfigurationWizard._get_input(
+                "Log Level (debug/info/warn/error)", 
+                default="info", 
+                required=False
+            ) or "info"
+        else:
+            config['mcpServerPort'] = 3100
+            config['a2aServerPort'] = 3200
+            config['logLevel'] = "info"
+        
+        # ===== CONFIGURATION SUMMARY =====
+        Logger.header("\n" + "="*60)
+        Logger.header("CONFIGURATION SUMMARY")
+        Logger.header("="*60)
+        Logger.info("Please review your configuration:\n")
+        
+        Logger.info(f"Database: {config['dbUrl']}:{config['dbPort']}/{config['dbDatabase']}")
+        Logger.info(f"CodeGen User: {config['codeGenLogin']}")
+        Logger.info(f"MJAPI User: {config['mjAPILogin']}")
+        Logger.info(f"GraphQL Port: {config['graphQLPort']}")
+        Logger.info(f"Auth Type: {config['authType']}")
+        if config['createNewUser'].upper() == 'Y':
+            Logger.info(f"Admin User: {config['userName']} ({config['userEmail']})")
+        Logger.info(f"AI Providers: {len([k for k in ['openAIAPIKey', 'anthropicAPIKey', 'mistralAPIKey', 'googleAPIKey'] if config.get(k)])} configured")
+        
+        Logger.info("\n")
+        confirm = ConfigurationWizard._get_input(
+            "Is this configuration correct? (Y/n)", 
+            default="Y", 
+            required=False
+        )
+        
+        if confirm.upper() == 'N':
+            Logger.warning("Configuration cancelled. Restarting wizard...")
+            return ConfigurationWizard.run()
         
         return config
     
