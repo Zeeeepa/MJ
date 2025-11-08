@@ -511,11 +511,27 @@ class Dashboard:
 def main():
     """Main entry point."""
     
-    parser = argparse.ArgumentParser(description="MemberJunction Service Manager")
+    parser = argparse.ArgumentParser(
+        description="MemberJunction Service Manager with AI Error Recovery",
+        epilog="""
+Examples:
+  python start.py                    # Start all services
+  python start.py --api-only         # Start only API server
+  python start.py --ui-only          # Start only Explorer UI
+  python start.py --no-monitor       # Start without interactive monitoring
+  python start.py --check-only       # Only check prerequisites, don't start
+
+For more information, see INSTRUCTIONS.md
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument('--api-only', action='store_true', help="Start only API server")
     parser.add_argument('--ui-only', action='store_true', help="Start only Explorer UI")
     parser.add_argument('--all', action='store_true', default=True, help="Start all services (default)")
-    parser.add_argument('--production', action='store_true', help="Start in production mode")
+    parser.add_argument('--production', action='store_true', help="Start in production mode with pm2")
+    parser.add_argument('--no-monitor', action='store_true', help="Start services without interactive monitoring")
+    parser.add_argument('--check-only', action='store_true', help="Only run pre-start validation checks")
+    parser.add_argument('--verbose', action='store_true', help="Show verbose output")
     args = parser.parse_args()
     
     # Print banner
@@ -538,9 +554,16 @@ def main():
             Logger.error(f"  - {issue}")
         Logger.info("\nPlease resolve these issues before starting services.")
         Logger.info("Run 'python setup.py' if you haven't completed the setup.")
+        if args.check_only:
+            Logger.info("\nValidation completed (check-only mode)")
         sys.exit(1)
     
     Logger.success("✓ Pre-start validation passed!\n")
+    
+    if args.check_only:
+        Logger.success("✓ All checks passed! System is ready to start services.")
+        Logger.info("\nRun without --check-only to start services.")
+        sys.exit(0)
     
     # Determine which services to start
     services = []
@@ -569,16 +592,35 @@ def main():
     Logger.info("  - Explorer UI: http://localhost:4200")
     Logger.info("\nPress Ctrl+C to stop all services\n")
     
-    # Start dashboard
-    try:
-        dashboard = Dashboard(managers)
-        dashboard.display()
-    except KeyboardInterrupt:
-        Logger.warning("\n\nShutting down services...")
-        for manager in managers:
-            manager.stop()
-        Logger.success("All services stopped. Goodbye!")
-        sys.exit(0)
+    # Start dashboard or simple monitoring
+    if args.no_monitor:
+        Logger.info("Running in no-monitor mode. Services will run in background.")
+        Logger.info("Check services.log for output.")
+        Logger.info("Press Ctrl+C to stop all services...")
+        try:
+            while True:
+                time.sleep(1)
+                # Check if any service died
+                for manager in managers:
+                    if manager.process and manager.process.poll() is not None:
+                        Logger.error(f"{manager.config['name']} has stopped unexpectedly!")
+        except KeyboardInterrupt:
+            Logger.warning("\n\nShutting down services...")
+            for manager in managers:
+                manager.stop()
+            Logger.success("All services stopped. Goodbye!")
+            sys.exit(0)
+    else:
+        # Start interactive dashboard
+        try:
+            dashboard = Dashboard(managers)
+            dashboard.display()
+        except KeyboardInterrupt:
+            Logger.warning("\n\nShutting down services...")
+            for manager in managers:
+                manager.stop()
+            Logger.success("All services stopped. Goodbye!")
+            sys.exit(0)
 
 if __name__ == "__main__":
     try:
@@ -589,4 +631,3 @@ if __name__ == "__main__":
     except Exception as e:
         Logger.error(f"\nUnexpected error: {e}")
         sys.exit(1)
-

@@ -23,6 +23,7 @@ import json
 import platform
 import time
 import re
+import argparse
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
@@ -327,10 +328,20 @@ class PrerequisitesChecker:
     
     @staticmethod
     def check_os() -> Tuple[bool, str]:
-        """Check if OS is Windows."""
-        if platform.system() != 'Windows':
-            return False, "This setup script is designed for Windows. Use the manual installation guide for other OS."
-        return True, f"Operating System: Windows {platform.version()}"
+        """Check if OS is supported."""
+        os_name = platform.system()
+        os_version = platform.version()
+        
+        if os_name == 'Windows':
+            return True, f"Operating System: Windows {os_version} ✓"
+        elif os_name == 'Linux':
+            Logger.warning("Running on Linux. Some Windows-specific features may not be available.")
+            return True, f"Operating System: Linux {os_version} ✓"
+        elif os_name == 'Darwin':
+            Logger.warning("Running on macOS. Some Windows-specific features may not be available.")
+            return True, f"Operating System: macOS {os_version} ✓"
+        else:
+            return False, f"Unsupported OS: {os_name}. Supported: Windows, Linux, macOS"
     
     @staticmethod
     def check_node() -> Tuple[bool, str]:
@@ -364,17 +375,23 @@ class PrerequisitesChecker:
     def check_typescript() -> Tuple[bool, str]:
         """Check TypeScript installation."""
         try:
-            result = subprocess.run(['tsc', '-v'], capture_output=True, text=True)
+            result = subprocess.run(['tsc', '-v'], capture_output=True, text=True, timeout=5)
             version = result.stdout.strip()
             return True, f"TypeScript: {version} ✓"
+        except subprocess.TimeoutExpired:
+            return False, "TypeScript command timed out"
+        except FileNotFoundError:
+            Logger.warning("TypeScript not found globally. Will be installed locally during npm install.")
+            return True, "TypeScript: Will be installed locally ⚠️"
         except Exception as e:
-            return False, "TypeScript not found. Install globally: npm install -g typescript"
+            Logger.warning(f"TypeScript check failed: {e}. Will be installed during npm install.")
+            return True, "TypeScript: Will be installed locally ⚠️"
     
     @staticmethod
     def check_angular_cli() -> Tuple[bool, str]:
         """Check Angular CLI installation."""
         try:
-            result = subprocess.run(['ng', 'version'], capture_output=True, text=True)
+            result = subprocess.run(['ng', 'version'], capture_output=True, text=True, timeout=10)
             if 'Angular CLI' in result.stdout:
                 version_match = re.search(r'Angular CLI: (\d+\.\d+\.\d+)', result.stdout)
                 if version_match:
@@ -383,10 +400,17 @@ class PrerequisitesChecker:
                     if major >= 18:
                         return True, f"Angular CLI: {version} ✓"
                     else:
-                        return False, f"Angular CLI {version} found. Requires v18+."
-            return False, "Angular CLI not detected properly."
+                        Logger.warning(f"Angular CLI {version} found but v18+ recommended")
+                        return True, f"Angular CLI: {version} (v18+ recommended) ⚠️"
+            return True, "Angular CLI: Not detected (will use local version) ⚠️"
+        except subprocess.TimeoutExpired:
+            return False, "Angular CLI command timed out"
+        except FileNotFoundError:
+            Logger.warning("Angular CLI not found globally. Will use local version from package.")
+            return True, "Angular CLI: Will use local version ⚠️"
         except Exception as e:
-            return False, "Angular CLI not found. Install: npm install -g @angular/cli@18"
+            Logger.warning(f"Angular CLI check failed: {e}. Will use local version.")
+            return True, "Angular CLI: Will use local version ⚠️"
     
     @staticmethod
     def check_disk_space() -> Tuple[bool, str]:
@@ -403,6 +427,35 @@ class PrerequisitesChecker:
             return False, f"Could not check disk space: {e}"
     
     @staticmethod
+    def check_sql_server() -> Tuple[bool, str]:
+        """Check SQL Server availability (optional)."""
+        try:
+            # Try to detect SQL Server on Windows
+            if platform.system() == 'Windows':
+                result = subprocess.run(
+                    ['powershell', '-Command', 'Get-Service -Name MSSQL* | Select-Object -First 1'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if 'MSSQL' in result.stdout and 'Running' in result.stdout:
+                    return True, "SQL Server: Detected and running ✓"
+                elif 'MSSQL' in result.stdout:
+                    return True, "SQL Server: Detected but not running ⚠️"
+                else:
+                    Logger.info("SQL Server not detected. You can use Azure SQL or install later.")
+                    return True, "SQL Server: Not detected (optional) ⚠️"
+            else:
+                Logger.info("SQL Server check skipped on non-Windows platform.")
+                return True, "SQL Server: Check skipped (non-Windows) ⚠️"
+        except subprocess.TimeoutExpired:
+            Logger.warning("SQL Server check timed out")
+            return True, "SQL Server: Check timed out (optional) ⚠️"
+        except Exception as e:
+            Logger.warning(f"SQL Server check failed: {e}")
+            return True, "SQL Server: Check failed (optional) ⚠️"
+    
+    @staticmethod
     def check_all() -> bool:
         """Run all prerequisite checks."""
         Logger.header("📋 Checking Prerequisites")
@@ -413,17 +466,26 @@ class PrerequisitesChecker:
             PrerequisitesChecker.check_npm,
             PrerequisitesChecker.check_typescript,
             PrerequisitesChecker.check_angular_cli,
-            PrerequisitesChecker.check_disk_space
+            PrerequisitesChecker.check_disk_space,
+            PrerequisitesChecker.check_sql_server
         ]
         
         all_passed = True
+        warnings = 0
         for check in checks:
             passed, message = check()
             if passed:
-                Logger.success(f"✓ {message}")
+                if '⚠️' in message:
+                    Logger.warning(f"⚠ {message}")
+                    warnings += 1
+                else:
+                    Logger.success(f"✓ {message}")
             else:
                 Logger.error(f"✗ {message}")
                 all_passed = False
+        
+        if warnings > 0:
+            Logger.info(f"\n{warnings} warnings found. Setup can continue but some features may not work.")
         
         return all_passed
 
@@ -662,12 +724,21 @@ class SetupExecutor:
 def main():
     """Main setup script entry point."""
     
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="MemberJunction Intelligent Setup Script")
+    parser.add_argument('--dry-run', action='store_true', help="Check prerequisites without installing")
+    parser.add_argument('--skip-prereqs', action='store_true', help="Skip prerequisite checks")
+    parser.add_argument('--skip-database', action='store_true', help="Skip database setup phase")
+    parser.add_argument('--start-from', choices=['prerequisites', 'configuration', 'database', 'packages', 'codegen', 'build'], help="Start from specific phase")
+    args = parser.parse_args()
+    
     # Print banner
+    os_name = "Cross-Platform" if platform.system() != 'Windows' else "Windows"
     print(f"""
 {Colors.HEADER}{Colors.BOLD}
 ╔═══════════════════════════════════════════════════════════════╗
-║  MemberJunction Intelligent Setup Script for Windows         ║
-║  Version 1.0                                                  ║
+║  MemberJunction Intelligent Setup Script                     ║
+║  Version 2.0 - {os_name:<45s} ║
 ╚═══════════════════════════════════════════════════════════════╝
 {Colors.ENDC}
     """)
@@ -689,16 +760,30 @@ def main():
             state.clear()
     
     # Phase 1: Prerequisites
-    if state.can_resume_from('prerequisites'):
+    if not args.skip_prereqs and state.can_resume_from('prerequisites'):
         if not PrerequisitesChecker.check_all():
-            Logger.error("\n❌ Prerequisites check failed!")
-            Logger.error("Please install missing prerequisites and run this script again.")
-            Logger.info("Refer to INSTRUCTIONS.md for detailed installation instructions.")
-            sys.exit(1)
+            if args.dry_run:
+                Logger.warning("\n⚠️ Prerequisites check failed (dry-run mode)")
+                Logger.info("Install missing prerequisites before running actual setup.")
+                sys.exit(0)
+            else:
+                Logger.error("\n❌ Prerequisites check failed!")
+                Logger.error("Please install missing prerequisites and run this script again.")
+                Logger.info("Refer to INSTRUCTIONS.md for detailed installation instructions.")
+                Logger.info("\nTip: Run with --dry-run to check prerequisites without installing")
+                sys.exit(1)
+        
+        if args.dry_run:
+            Logger.success("\n✓ All prerequisites satisfied! Ready for installation.")
+            Logger.info("\nRun without --dry-run to proceed with installation.")
+            sys.exit(0)
         
         state.mark_phase_complete('prerequisites')
         Logger.success("\n✓ All prerequisites satisfied!\n")
         time.sleep(2)
+    elif args.skip_prereqs:
+        Logger.warning("Skipping prerequisites check (--skip-prereqs)")
+        state.mark_phase_complete('prerequisites')
     
     # Phase 2: Configuration
     if state.can_resume_from('configuration'):
@@ -759,4 +844,3 @@ if __name__ == "__main__":
         Logger.error(f"\n❌ Unexpected error: {e}")
         Logger.error("Please check setup.log for details.")
         sys.exit(1)
-
