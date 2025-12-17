@@ -1,0 +1,12 @@
+{
+  "accounts": [
+    {
+      "name": "K2Think AI",
+      "url": "https://www.k2think.ai",
+      "email": "developer@pixelium.uk",
+      "password": "developer123?",
+      "enabled": true
+    }
+  ]
+}
+

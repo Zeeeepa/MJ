@@ -58,6 +58,7 @@
     "url": "https://github.com/MemberJunction/MJ"
   },
   "dependencies": {
+    "@foxruv/iris": "^1.8.19",
     "@memberjunction/cli": "2.125.0",
     "archiver": "~7.0.0",
     "extract-files": "~13.0.0",
