@@ -76,20 +76,16 @@ Return as JSON:
     {
       "name": "send_message",
       "type": "message",
-      "elements": {
-        "inputField": {
-          "selector": "string or null",
-          "coordinates": {"x": number, "y": number},
-          "confidence": number,
-          "label": "description"
-        },
-        "sendButton": { ... }
-      },
-      "description": "Send a message to the AI"
-    },
-    ...
+      "description": "Send a message to the AI",
+      "actions": [
+        {"type": "click", "description": "Click input", "selector": "#input", "coordinates": {"x": 400, "y": 300}},
+        {"type": "type", "description": "Type message", "value": "{message}"},
+        {"type": "click", "description": "Click send", "selector": "button", "coordinates": {"x": 500, "y": 350}},
+        {"type": "wait", "description": "Wait for response"}
+      ]
+    }
   ],
-  "confidence": number (0-1)
+  "confidence": 0.95
 }`;
 
     try {
@@ -250,4 +246,3 @@ Return JSON:
     }
   }
 }
-

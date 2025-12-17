@@ -69,9 +69,9 @@ async function initializeServices(): Promise<void> {
       
       console.log(`✅ Service ready: ${service.id}`);
       console.log(`   Model name: service-${service.id}`);
-      console.log(`   Flows discovered: ${service.flows.length}`);
-      service.flows.forEach(flow => {
-        console.log(`      - ${flow.name}: ${flow.description}`);
+      console.log(`   Flows discovered: ${service.flows?.length || 0}`);
+      service.flows?.forEach(flow => {
+        console.log(`      - ${flow.name}: ${flow.description || 'No description'}`);
       });
     } catch (error: any) {
       console.error(`❌ Failed to initialize ${account.name}:`, error.message);
@@ -147,4 +147,3 @@ process.on('SIGTERM', () => {
 
 // Start the server
 start();
-

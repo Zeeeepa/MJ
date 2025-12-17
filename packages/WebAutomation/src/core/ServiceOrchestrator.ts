@@ -29,7 +29,11 @@ export class ServiceOrchestrator {
     try {
       // Initialize components
       this.browser = new BrowserController({ headless: true });
-      this.vision = new VisionAnalyzer();
+      this.vision = new VisionAnalyzer(
+        process.env.VISION_AI_API_KEY || '',
+        process.env.VISION_AI_BASE_URL || 'https://api.z.ai/v1',
+        process.env.VISION_AI_MODEL || 'glm-4.6v'
+      );
       await this.browser.initialize();
       this.executor = new FlowExecutor(this.browser, this.vision);
       
@@ -132,17 +136,17 @@ export class ServiceOrchestrator {
     const screenshot = await this.browser.screenshot();
     const base64 = screenshot.toString('base64');
     
-    const discoveredFlows = await this.vision.discoverFlows(base64);
+    const discoveredFlowsResult = await this.vision.discoverFlows(base64);
     const flows: Flow[] = [];
     const serviceId = this.getServiceId();
     
-    for (const discovered of discoveredFlows) {
+    for (const discovered of discoveredFlowsResult.flows) {
       const flow: Flow = {
         serviceId,
         name: discovered.name,
         description: discovered.description,
         type: discovered.type as any,
-        steps: discovered.actions.map(action => ({
+        steps: (discovered.actions || []).map((action: any) => ({
           type: action.type as any,
           description: action.description,
           selector: action.selector,
@@ -235,4 +239,3 @@ export class ServiceOrchestrator {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
-

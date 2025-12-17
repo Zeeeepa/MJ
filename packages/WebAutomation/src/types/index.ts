@@ -14,25 +14,27 @@ export interface Service {
   id: string;
   name: string;
   url: string;
-  email: string;
+  email?: string;
   status: 'pending' | 'analyzing' | 'ready' | 'failed';
   apiKey?: string;
   flows?: Flow[];
   cookies?: any[];
-  createdAt: Date;
+  createdAt?: Date;
   lastAnalyzedAt?: Date;
+  lastSync: Date;
 }
 
 export interface Flow {
-  id: string;
+  id?: string;
   serviceId: string;
   name: string;
+  description?: string;
   type: 'message' | 'model_selection' | 'new_chat' | 'file_upload' | 'custom';
   steps: FlowStep[];
-  validated: boolean;
-  successCount: number;
-  failureCount: number;
-  avgExecutionTime: number;
+  validated?: boolean;
+  successCount?: number;
+  failureCount?: number;
+  avgExecutionTime?: number;
 }
 
 export interface FlowStep {
@@ -74,14 +76,21 @@ export interface FlowDiscoveryResult {
 export interface DiscoveredFlow {
   name: string;
   type: string;
-  elements: {
+  elements?: {
     [key: string]: ElementInfo;
   };
+  actions?: Array<{
+    type: string;
+    description: string;
+    selector?: string;
+    coordinates?: { x: number; y: number };
+    value?: string;
+  }>;
   description: string;
 }
 
 export interface ProgressEvent {
-  type: 'screenshot' | 'vision_analysis' | 'login' | 'flow_discovery' | 'flow_test' | 'complete' | 'error';
+  event: string;
   timestamp: Date;
   data: any;
   screenshotPath?: string;
@@ -117,4 +126,3 @@ export interface OpenAIChatResponse {
     total_tokens: number;
   };
 }
-
