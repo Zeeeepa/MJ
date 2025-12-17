@@ -1,0 +1,17 @@
+{
+  "name": "@memberjunction/webchat-gateway-sandbox",
+  "version": "1.0.0",
+  "description": "Docker sandbox for Web Chat Gateway",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "docker:build": "docker build -t webchat-gateway .",
+    "docker:run": "docker-compose up -d",
+    "docker:stop": "docker-compose down"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "playwright-core": "^1.49.0"
+  }
+}
