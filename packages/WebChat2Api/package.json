@@ -1,32 +1,69 @@
 {
   "name": "@memberjunction/webchat2api",
-  "version": "1.0.0",
-  "description": "Convert any web chat UI into OpenAI-compatible API endpoints",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "version": "2.0.0",
+  "description": "Convert any web chat UI into OpenAI-compatible API endpoints with multi-provider support and parallel execution",
+  "main": "dist/server-enhanced.js",
+  "types": "dist/server-enhanced.d.ts",
   "scripts": {
-    "start": "ts-node src/server.ts",
-    "dev": "ts-node-dev --respawn src/server.ts",
+    "start": "node dist/server-enhanced.js",
+    "start:basic": "node dist/server.js",
+    "dev": "ts-node src/server-enhanced.ts",
+    "dev:basic": "ts-node src/server.ts",
     "build": "tsc",
-    "test": "jest"
+    "test": "jest",
+    "migrate": "sqlcmd -i migrations/001_create_webchat_tables.sql"
   },
+  "keywords": [
+    "webchat",
+    "openai",
+    "api",
+    "gateway",
+    "automation",
+    "multi-provider",
+    "parallel",
+    "load-balancing"
+  ],
+  "author": "MemberJunction",
+  "license": "MIT",
   "dependencies": {
     "@memberjunction/core": "^2.125.0",
-    "express": "^4.18.2",
+    "@memberjunction/server": "^2.125.0",
+    "@memberjunction/ai": "^2.125.0",
+    "@memberjunction/ai-openai": "^2.125.0",
+    "@memberjunction/ai-anthropic": "^2.125.0",
+    "@memberjunction/ai-gemini": "^2.125.0",
+    "@memberjunction/actions": "^2.125.0",
+    "@memberjunction/queue": "^2.125.0",
+    "@memberjunction/storage": "^2.125.0",
+    "@memberjunction/communication-engine": "^2.125.0",
+    "@memberjunction/sqlserver-dataprovider": "^2.125.0",
+    "@memberjunction/metadata-sync": "^2.125.0",
+    "mj_generatedentities": "^1.0.0",
     "playwright": "^1.40.0",
+    "express": "^4.18.2",
     "axios": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.20",
     "@types/node": "^20.8.0",
     "@types/cors": "^2.8.15",
     "@types/uuid": "^9.0.6",
+    "@types/ws": "^8.5.8",
+    "@types/bcrypt": "^5.0.2",
     "typescript": "^5.4.5",
     "ts-node": "^10.9.1",
-    "ts-node-dev": "^2.0.0"
+    "ts-node-dev": "^2.0.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
 
