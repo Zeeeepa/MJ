@@ -18,10 +18,15 @@
  */
 
 import { ComputerUseAgent } from '@centralinc/browseragent';
-import { crawl } from '@just-every/crawl';
-import Anthropic from '@anthropic-ai/sdk';
-import { Page } from 'playwright';
 import * as crypto from 'crypto';
+
+// Optional markdown extraction
+let crawl: any;
+try {
+  crawl = require('@just-every/crawl').default || require('@just-every/crawl');
+} catch {
+  crawl = null;
+}
 
 export interface WebChatConfig {
   url: string;
@@ -76,12 +81,8 @@ export class WebChatGatewayAI {
 
     // Initialize Anthropic Computer Use agent
     this.agent = new ComputerUseAgent({
-      apiKey: config.anthropicApiKey || process.env.ANTHROPIC_API_KEY,
-      model: 'claude-3-5-sonnet-20241022', // Computer Use model
-      options: {
-        maxTokens: 4096,
-        temperature: 0.7
-      }
+      apiKey: config.anthropicApiKey || process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN,
+      model: process.env.MODEL || 'claude-3-5-sonnet-20241022' // Computer Use model / GLM-4.6v
     });
   }
 
@@ -110,31 +111,22 @@ export class WebChatGatewayAI {
       console.log('🤖 AI Agent executing task:', task);
       
       // Let AI handle the entire flow autonomously
-      const result = await this.agent.execute(task, {
-        schema: {
-          type: 'object',
-          properties: {
-            response: { type: 'string', description: 'The AI chat response' },
-            pageUrl: { type: 'string', description: 'Current page URL' },
-            screenshot: { type: 'string', description: 'Base64 screenshot' }
-          },
-          required: ['response']
-        }
-      });
+      // Note: browseragent returns string response directly
+      const result = await this.agent.execute(task) as any;
 
       console.log('✅ AI Agent completed task');
 
-      // Extract response
-      let responseText = result.response;
+      // Extract response - browseragent may return structured or string data
+      let responseText = typeof result === 'string' ? result : (result.response || result.toString());
 
-      // Optional: Use crawl for clean Markdown extraction
-      if (this.config.useMarkdownExtraction && result.pageUrl) {
+      // Optional: Use crawl for clean Markdown extraction if we have a URL
+      if (this.config.useMarkdownExtraction && result.pageUrl && crawl) {
         try {
           const markdown = await crawl(result.pageUrl);
           // Try to extract just the AI response from the full page
           responseText = this.extractResponse(markdown, responseText);
-        } catch (error) {
-          console.warn('⚠️ Markdown extraction failed, using AI-extracted text:', error);
+        } catch (error: any) {
+          console.warn('⚠️ Markdown extraction failed, using AI-extracted text:', error?.message);
         }
       }
 
@@ -306,19 +298,11 @@ Navigate to ${this.config.url} and verify it loads successfully.
 Return "success" if the page loads, "error" otherwise.
       `.trim();
 
-      const result = await this.agent.execute(task, {
-        schema: {
-          type: 'object',
-          properties: {
-            status: { type: 'string' }
-          }
-        },
-        options: {
-          maxTokens: 1024
-        }
-      });
+      const result = await this.agent.execute(task) as any;
+      
+      const status = typeof result === 'string' ? result : (result.status || result.toString());
 
-      return result.status === 'success';
+      return status.toLowerCase().includes('success');
     } catch (error) {
       console.error('Health check failed:', error);
       return false;
@@ -329,7 +313,7 @@ Return "success" if the page loads, "error" otherwise.
    * Close browser and cleanup
    */
   async cleanup(): Promise<void> {
-    await this.agent.cleanupManagedPages();
+    // browseragent handles cleanup internally
     this.sessionCache.clear();
   }
 }
@@ -357,4 +341,3 @@ export function createAIGateway(config: WebChatConfig): WebChatGatewayAI {
  * 
  * console.log(response.choices[0].message.content);
  */
-

@@ -40,6 +40,7 @@
     "@memberjunction/core": "^2.125.0",
     "@memberjunction/metadata-sync": "^2.125.0",
     "@memberjunction/queue": "^2.125.0",
+    "@memberjunction/react-test-harness": "^2.125.0",
     "@memberjunction/server": "^2.125.0",
     "@memberjunction/sqlserver-dataprovider": "^2.125.0",
     "@memberjunction/storage": "^2.125.0",
@@ -52,7 +53,9 @@
     "mj_generatedentities": "^1.0.0",
     "playwright": "^1.40.0",
     "qa-agent": "^2.3.1",
+    "qastell": "^0.6.1",
     "uuid": "^9.0.1",
+    "valifetch": "^0.2.0",
     "ws": "^8.14.2"
   },
   "devDependencies": {
