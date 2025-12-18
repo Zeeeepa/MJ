@@ -29,6 +29,7 @@
   "author": "MemberJunction",
   "license": "MIT",
   "dependencies": {
+    "@adaas/a-server": "^0.0.22",
     "@centralinc/browseragent": "^1.9.5",
     "@just-every/crawl": "^1.0.8",
     "@memberjunction/actions": "^2.125.0",
@@ -51,7 +52,7 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "mj_generatedentities": "^1.0.0",
-    "playwright": "^1.40.0",
+    "playwright": "^1.57.0",
     "qa-agent": "^2.3.1",
     "qastell": "^0.6.1",
     "uuid": "^9.0.1",
