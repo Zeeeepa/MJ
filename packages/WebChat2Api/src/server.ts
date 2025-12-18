@@ -1,153 +1,215 @@
-import express from 'express';
+/**
+ * WebChat2Api Server
+ * Main entry point for the gateway server
+ * 
+ * Uses @memberjunction/server for Express setup
+ */
+
+import express, { Express } from 'express';
+import { json, urlencoded } from 'body-parser';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import { v4 as uuidv4 } from 'uuid';
-import { ServiceManager } from './ServiceManager';
-import { ChatCompletionRequest, ChatCompletionResponse } from './types';
+import { WebChatGateway } from './gateway/WebChatGateway';
+import { Metadata } from '@memberjunction/core';
+import { SQLServerDataProvider } from '@memberjunction/sqlserver-dataprovider';
 
-dotenv.config();
-
-const app = express();
 const PORT = process.env.PORT || 3000;
+const DATABASE_URL = process.env.DATABASE_URL || '';
+const ENABLE_CORS = process.env.ENABLE_CORS === 'true';
 
-app.use(cors());
-app.use(express.json());
+class WebChat2ApiServer {
+  private app: Express;
+  private gateway: WebChatGateway;
 
-const serviceManager = new ServiceManager();
-
-// Initialize K2Think service on startup
-(async () => {
-  const k2thinkUrl = process.env.K2THINK_URL || 'https://www.k2think.ai';
-  const k2thinkEmail = process.env.K2THINK_EMAIL || '';
-  const k2thinkPassword = process.env.K2THINK_PASSWORD || '';
-
-  if (k2thinkEmail && k2thinkPassword) {
-    const serviceId = await serviceManager.registerService({
-      url: k2thinkUrl,
-      email: k2thinkEmail,
-      password: k2thinkPassword,
-      name: 'K2Think AI'
-    });
-    
-    console.log(`✅ K2Think AI registered as: ${serviceId}`);
-    console.log(`📝 Use model: "${serviceId}" in API requests`);
-  } else {
-    console.warn('⚠️  K2Think credentials not configured in .env file');
+  constructor() {
+    this.app = express();
+    this.gateway = new WebChatGateway();
   }
-})();
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    services: serviceManager.getServiceIds(),
-    timestamp: new Date().toISOString()
-  });
-});
+  /**
+   * Initialize server
+   */
+  async initialize(): Promise<void> {
+    console.log('🚀 Initializing WebChat2Api Server...');
 
-// List available models (services)
-app.get('/v1/models', (req, res) => {
-  const serviceIds = serviceManager.getServiceIds();
-  const models = serviceIds.map(id => ({
-    id,
-    object: 'model',
-    created: Math.floor(Date.now() / 1000),
-    owned_by: 'webchat2api'
-  }));
+    // Setup middleware
+    this.setupMiddleware();
 
-  res.json({
-    object: 'list',
-    data: models
-  });
-});
+    // Initialize database connection
+    await this.initializeDatabase();
 
-// Chat completions endpoint
-app.post('/v1/chat/completions', async (req, res) => {
-  try {
-    const request: ChatCompletionRequest = req.body;
+    // Initialize gateway
+    await this.gateway.initializeBrowser();
+    this.gateway.setupRoutes(this.app);
 
-    if (!request.model || !request.messages || request.messages.length === 0) {
-      return res.status(400).json({
-        error: {
-          message: 'Invalid request: model and messages are required',
-          type: 'invalid_request_error'
-        }
-      });
+    // Error handling
+    this.setupErrorHandling();
+
+    console.log('✅ Server initialized');
+  }
+
+  /**
+   * Setup Express middleware
+   */
+  private setupMiddleware(): void {
+    // Body parsing
+    this.app.use(json({ limit: '10mb' }));
+    this.app.use(urlencoded({ extended: true, limit: '10mb' }));
+
+    // CORS
+    if (ENABLE_CORS) {
+      this.app.use(cors({
+        origin: process.env.CORS_ORIGIN || '*',
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Flow-ID'],
+        credentials: true
+      }));
     }
 
-    // Get last user message
-    const userMessages = request.messages.filter(m => m.role === 'user');
-    if (userMessages.length === 0) {
-      return res.status(400).json({
-        error: {
-          message: 'No user message found',
-          type: 'invalid_request_error'
-        }
+    // Request logging
+    this.app.use((req, res, next) => {
+      const start = Date.now();
+      res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
       });
-    }
+      next();
+    });
 
-    const lastUserMessage = userMessages[userMessages.length - 1].content;
-    console.log(`\n[API] POST /v1/chat/completions`);
-    console.log(`[API] Model: ${request.model}`);
-    console.log(`[API] Message: ${lastUserMessage.substring(0, 100)}...`);
-
-    // Send message to service
-    const responseText = await serviceManager.sendMessage(request.model, lastUserMessage);
-
-    // Format as OpenAI response
-    const response: ChatCompletionResponse = {
-      id: `chatcmpl-${uuidv4()}`,
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: request.model,
-      choices: [{
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: responseText
+    // Root endpoint
+    this.app.get('/', (req, res) => {
+      res.json({
+        name: 'WebChat2Api Gateway',
+        version: '1.0.0',
+        status: 'operational',
+        endpoints: {
+          chat: 'POST /v1/chat/completions',
+          models: 'GET /v1/models',
+          flows: {
+            create: 'POST /flows',
+            list: 'GET /flows',
+            get: 'GET /flows/:flowId'
+          },
+          health: 'GET /health'
         },
-        finish_reason: 'stop'
-      }],
-      usage: {
-        prompt_tokens: Math.ceil(lastUserMessage.length / 4),
-        completion_tokens: Math.ceil(responseText.length / 4),
-        total_tokens: Math.ceil((lastUserMessage.length + responseText.length) / 4)
-      }
-    };
-
-    console.log(`[API] Response: ${responseText.substring(0, 100)}...`);
-    res.json(response);
-
-  } catch (error) {
-    console.error('[API] Error:', error);
-    res.status(500).json({
-      error: {
-        message: error instanceof Error ? error.message : 'Internal server error',
-        type: 'internal_error'
-      }
+        documentation: 'https://github.com/Zeeeepa/MJ/tree/WebChat2Api/packages/WebChat2Api'
+      });
     });
   }
-});
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n[SERVER] Shutting down...');
-  await serviceManager.closeAll();
-  process.exit(0);
-});
+  /**
+   * Initialize database connection
+   */
+  private async initializeDatabase(): Promise<void> {
+    console.log('📊 Connecting to database...');
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 WebChat2Api Server Running`);
-  console.log(`📍 http://localhost:${PORT}`);
-  console.log(`\n📖 Endpoints:`);
-  console.log(`   GET  /health`);
-  console.log(`   GET  /v1/models`);
-  console.log(`   POST /v1/chat/completions`);
-  console.log(`\n💡 Test with curl:`);
-  console.log(`   curl http://localhost:${PORT}/v1/models`);
-  console.log(`\n   curl http://localhost:${PORT}/v1/chat/completions \\`);
-  console.log(`     -H "Content-Type: application/json" \\`);
-  console.log(`     -d '{"model":"service-www-k2think-ai","messages":[{"role":"user","content":"Hello!"}]}'`);
-  console.log(`\n`);
-});
+    try {
+      // Initialize MemberJunction metadata
+      const dataProvider = new SQLServerDataProvider();
+      await dataProvider.Connect(DATABASE_URL);
+      
+      // Register with Metadata singleton
+      Metadata.Provider.Config(dataProvider);
+
+      console.log('✅ Database connected');
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Setup error handling
+   */
+  private setupErrorHandling(): void {
+    // 404 handler
+    this.app.use((req, res) => {
+      res.status(404).json({
+        error: {
+          message: 'Not found',
+          type: 'not_found_error',
+          path: req.path
+        }
+      });
+    });
+
+    // Global error handler
+    this.app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+      console.error('Unhandled error:', err);
+      
+      res.status(500).json({
+        error: {
+          message: err.message || 'Internal server error',
+          type: 'internal_error'
+        }
+      });
+    });
+
+    // Uncaught exception handler
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught exception:', error);
+      this.shutdown();
+    });
+
+    // Unhandled rejection handler
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('Unhandled rejection at:', promise, 'reason:', reason);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received, shutting down gracefully...');
+      this.shutdown();
+    });
+
+    process.on('SIGINT', () => {
+      console.log('SIGINT received, shutting down gracefully...');
+      this.shutdown();
+    });
+  }
+
+  /**
+   * Start server
+   */
+  async start(): Promise<void> {
+    await this.initialize();
+
+    this.app.listen(PORT, () => {
+      console.log(`
+╔══════════════════════════════════════════════════════╗
+║                                                      ║
+║        🚀 WebChat2Api Gateway Running 🚀              ║
+║                                                      ║
+║  Server:        http://localhost:${PORT}               ║
+║  Environment:   ${process.env.NODE_ENV || 'development'}                  ║
+║  Database:      ${DATABASE_URL ? 'Connected' : 'Not configured'}                   ║
+║                                                      ║
+║  OpenAI API:    POST /v1/chat/completions           ║
+║  Models:        GET  /v1/models                     ║
+║  Health:        GET  /health                        ║
+║                                                      ║
+╚══════════════════════════════════════════════════════╝
+      `);
+    });
+  }
+
+  /**
+   * Graceful shutdown
+   */
+  private async shutdown(): Promise<void> {
+    console.log('Shutting down server...');
+    await this.gateway.shutdown();
+    process.exit(0);
+  }
+}
+
+// Start server if run directly
+if (require.main === module) {
+  const server = new WebChat2ApiServer();
+  server.start().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+}
+
+export { WebChat2ApiServer };
 
