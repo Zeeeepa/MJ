@@ -346,7 +346,7 @@ Respond ONLY with valid JSON, no markdown formatting.`;
         iteration++;
         console.log(`\n${'='.repeat(60)}`);
         console.log(`📍 Step ${iteration + 1}: Visual Analysis & Action`);
-        console.log(${'='.repeat(60)});
+        console.log(`${'='.repeat(60)}`);
 
         // Take screenshot
         const screenshotPath = await this.takeScreenshot(page, iteration);
