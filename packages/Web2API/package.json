@@ -7,17 +7,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/server/index.ts",
-    "dev:enhanced": "tsx watch src/server/enhanced-server.ts",
-    "start": "node dist/server/index.js",
-    "start:enhanced": "node dist/server/enhanced-server.js",
-    "start:dev": "npm run dev",
-    "start:enhanced:dev": "npm run dev:enhanced",
+    "start:production": "tsx src/production-server.ts",
+    "test:api": "tsx src/test-openai-api.ts",
     "test": "jest",
     "lint": "eslint src --ext .ts",
-    "clean": "rm -rf dist",
-    "register-services": "tsx src/scripts/register-services.ts",
-    "test-services": "tsx src/scripts/test-all-services.ts",
-    "test:real-auth": "tsx src/scripts/test-real-authentication.ts"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@memberjunction/ai": "^2.125.0",
