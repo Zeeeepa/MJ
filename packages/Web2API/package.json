@@ -7,13 +7,17 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/server/index.ts",
+    "dev:enhanced": "tsx watch src/server/enhanced-server.ts",
     "start": "node dist/server/index.js",
+    "start:enhanced": "node dist/server/enhanced-server.js",
     "start:dev": "npm run dev",
+    "start:enhanced:dev": "npm run dev:enhanced",
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist",
     "register-services": "tsx src/scripts/register-services.ts",
-    "test-services": "tsx src/scripts/test-all-services.ts"
+    "test-services": "tsx src/scripts/test-all-services.ts",
+    "test:real-auth": "tsx src/scripts/test-real-authentication.ts"
   },
   "dependencies": {
     "@memberjunction/ai": "^2.125.0",
@@ -69,4 +73,3 @@
   "author": "MemberJunction",
   "license": "MIT"
 }
-
