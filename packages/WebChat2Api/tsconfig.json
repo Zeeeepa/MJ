@@ -16,12 +16,7 @@
     "moduleResolution": "node"
   },
   "include": [
-    "src/production-server.ts",
-    "src/real-working-server.ts",
-    "src/simple-server.ts",
-    "src/types.ts",
-    "src/BrowserAutomation.ts",
-    "src/ServiceManager.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",

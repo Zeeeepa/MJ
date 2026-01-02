@@ -16,7 +16,11 @@
     "migrate": "sqlcmd -i migrations/001_create_webchat_tables.sql",
     "demo:ai": "ts-node src/examples/ai-native-demo.ts",
     "demo:ai:conversation": "ts-node src/examples/ai-native-demo.ts conversation",
-    "demo:ai:streaming": "ts-node src/examples/ai-native-demo.ts streaming"
+    "demo:ai:streaming": "ts-node src/examples/ai-native-demo.ts streaming",
+    "demo:multi-strategy": "ts-node src/examples/multi-strategy-demo.ts",
+    "demo:element-identification": "ts-node src/examples/multi-strategy-demo.ts element-identification",
+    "demo:flow-recording": "ts-node src/examples/multi-strategy-demo.ts flow-recording",
+    "demo:strategy-fallback": "ts-node src/examples/multi-strategy-demo.ts strategy-fallback"
   },
   "keywords": [
     "webchat",
@@ -47,6 +51,9 @@
     "@memberjunction/server": "^2.125.0",
     "@memberjunction/sqlserver-dataprovider": "^2.125.0",
     "@memberjunction/storage": "^2.125.0",
+    "@olib-ai/owl-browser-sdk": "^1.2.3",
+    "@skrillex1224/playwright-toolkit": "^2.0.50",
+    "agentic-qe": "^2.7.4",
     "axios": "^1.6.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
