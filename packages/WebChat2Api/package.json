@@ -1,0 +1,59 @@
+{
+  "name": "@memberjunction/webchat2api",
+  "version": "2.125.0",
+  "description": "Convert Web UIs to OpenAI-Compatible Inference Endpoints with multi-strategy browser automation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node dist/api/server.js",
+    "start:dev": "ts-node src/api/server.ts",
+    "demo:multi-strategy": "ts-node src/examples/multi-strategy-demo.ts",
+    "demo:element-identification": "ts-node src/examples/multi-strategy-demo.ts element-identification",
+    "demo:flow-recording": "ts-node src/examples/multi-strategy-demo.ts flow-recording",
+    "demo:strategy-fallback": "ts-node src/examples/multi-strategy-demo.ts strategy-fallback",
+    "demo:k2think": "ts-node src/examples/k2think-demo.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@daytonaio/sdk": "^0.128.1",
+    "@computesdk/daytona": "^1.6.10",
+    "@olib-ai/owl-browser-sdk": "^1.2.3",
+    "@skrillex1224/playwright-toolkit": "^2.0.50",
+    "@centralinc/browseragent": "^1.9.5",
+    "playwright": "^1.57.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ws": "^8.14.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.1",
+    "@memberjunction/core": "^2.125.0",
+    "@memberjunction/ai": "^2.125.0",
+    "@memberjunction/ai-anthropic": "^2.125.0",
+    "@memberjunction/ai-gemini": "^2.125.0",
+    "@memberjunction/ai-openai": "^2.125.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/ws": "^8.5.10",
+    "@types/uuid": "^9.0.7",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  },
+  "keywords": [
+    "web2api",
+    "browser-automation",
+    "openai-api",
+    "playwright",
+    "computer-use",
+    "vision-model",
+    "daytona",
+    "sandbox"
+  ],
+  "author": "MemberJunction",
+  "license": "MIT"
+}
